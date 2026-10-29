@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+# Recorded data: keep the folder structure, ignore large video clips
+data/**/*.mp4

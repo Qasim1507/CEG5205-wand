@@ -1,0 +1,7 @@
+# CEG5205 wand - Python dependencies (Python 3.10+, macOS)
+pyserial>=3.5
+numpy>=1.24
+pandas>=2.0
+opencv-python>=4.8
+pyqtgraph>=0.13
+PyQt6>=6.5
