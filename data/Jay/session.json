@@ -1,0 +1,374 @@
+{
+  "sessions": [
+    {
+      "date": "2026-11-01T12:37:40",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -3.7315,
+        0.0093,
+        0.0728
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 0,
+        "horizontal_swipe": 0,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:42:57",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -3.7315,
+        0.0093,
+        0.0728
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 50,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:44:10",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -4.1055,
+        0.2639,
+        -0.1721
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:47:48",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -4.1055,
+        0.2639,
+        -0.1721
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 1,
+        "idle": 0
+      },
+      "kept_this_run": 26,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:48:01",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -4.0305,
+        1.4407,
+        -0.3979
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 1,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:50:40",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -4.0305,
+        1.4407,
+        -0.3979
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 11,
+        "idle": 0
+      },
+      "kept_this_run": 10,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:51:22",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -4.0318,
+        0.5439,
+        0.0505
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 11,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:53:08",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -4.0318,
+        0.5439,
+        0.0505
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 0
+      },
+      "kept_this_run": 14,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:53:53",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -3.6398,
+        0.3787,
+        -0.295
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T12:55:58",
+      "participant": "p01",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -3.6398,
+        0.3787,
+        -0.295
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 25,
+      "skipped_this_run": 0
+    }
+  ]
+}
