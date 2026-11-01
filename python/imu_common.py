@@ -388,14 +388,53 @@ class ImuSource(ABC):
 # --------------------------------------------------------------------------
 
 def list_candidate_ports() -> list[str]:
-    """Every serial port on this Mac that looks like our Arduino, best first."""
+    """Find likely Arduino serial ports on Windows, macOS and Linux."""
     if list_ports is None:
         return []
-    devices = [p.device for p in list_ports.comports()]
-    ranked: list[str] = []
-    for prefix in PORT_PREFIXES:
-        ranked += sorted(d for d in devices if d.startswith(prefix))
-    return ranked
+
+    ports = list(list_ports.comports())
+
+    keywords = (
+        "arduino",
+        "usb serial",
+        "usb-serial",
+        "ch340",
+        "ch341",
+        "cp210",
+        "ftdi",
+    )
+
+    preferred = []
+    others = []
+
+    for port in ports:
+        device = port.device
+        description = (port.description or "").lower()
+        manufacturer = (port.manufacturer or "").lower()
+
+        # Identify likely Arduino or USB-to-serial devices
+        if any(k in description or k in manufacturer for k in keywords):
+            preferred.append(device)
+
+        # Also recognize macOS/Linux serial port names
+        elif device.startswith((
+            "/dev/cu.usb",
+            "/dev/ttyUSB",
+            "/dev/ttyACM",
+        )):
+            preferred.append(device)
+
+        else:
+            others.append(device)
+
+    # Prefer Arduino-like ports; use an unambiguous fallback
+    if preferred:
+        return preferred
+
+    if len(others) == 1:
+        return others
+
+    return []
 
 
 def find_port(preferred: str | None = None) -> str:
