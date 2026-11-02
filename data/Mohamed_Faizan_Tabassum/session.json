@@ -1,0 +1,78 @@
+{
+  "sessions": [
+    {
+      "date": "2026-11-01T22:24:25",
+      "participant": "Mohamed_Faizan_Tabassum",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -1.2455,
+        0.5677,
+        0.0078
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 0,
+        "horizontal_swipe": 0,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-01T22:32:41",
+      "participant": "Mohamed_Faizan_Tabassum",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        -1.2455,
+        0.5677,
+        0.0078
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": false,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 125,
+      "skipped_this_run": 0
+    }
+  ]
+}

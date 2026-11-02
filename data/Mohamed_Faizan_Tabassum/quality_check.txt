@@ -1,0 +1,23 @@
+
+=== samples per participant x gesture ===
+label                    vertical_swipe  horizontal_swipe  zigzag  circle  idle  TOTAL
+participant                                                                           
+Mohamed_Faizan_Tabassum              25                25      25      25    25    125
+
+total samples: 125
+
+=== per-sample checks ===
+                                                             file                  problem
+    Mohamed_Faizan_Tabassum/vertical_swipe/vertical_swipe_005.csv accel saturated (4.00 g)
+    Mohamed_Faizan_Tabassum/vertical_swipe/vertical_swipe_011.csv accel saturated (3.92 g)
+    Mohamed_Faizan_Tabassum/vertical_swipe/vertical_swipe_014.csv accel saturated (4.00 g)
+Mohamed_Faizan_Tabassum/horizontal_swipe/horizontal_swipe_001.csv accel saturated (4.00 g)
+Mohamed_Faizan_Tabassum/horizontal_swipe/horizontal_swipe_007.csv accel saturated (4.00 g)
+Mohamed_Faizan_Tabassum/horizontal_swipe/horizontal_swipe_009.csv accel saturated (4.00 g)
+Mohamed_Faizan_Tabassum/horizontal_swipe/horizontal_swipe_010.csv accel saturated (4.00 g)
+Mohamed_Faizan_Tabassum/horizontal_swipe/horizontal_swipe_011.csv accel saturated (3.91 g)
+                    Mohamed_Faizan_Tabassum/zigzag/zigzag_001.csv accel saturated (4.00 g)
+                    Mohamed_Faizan_Tabassum/zigzag/zigzag_007.csv accel saturated (4.00 g)
+                    Mohamed_Faizan_Tabassum/zigzag/zigzag_008.csv accel saturated (4.00 g)
+
+11 of 125 samples flagged
