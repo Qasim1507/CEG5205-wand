@@ -1,0 +1,374 @@
+{
+  "sessions": [
+    {
+      "date": "2026-11-03T14:13:33",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.6895,
+        0.8578,
+        -1.1254
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 0,
+        "horizontal_swipe": 0,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:20:36",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.6895,
+        0.8578,
+        -1.1254
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 7,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 32,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:20:55",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.4069,
+        0.6931,
+        -1.3974
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 7,
+        "zigzag": 0,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:23:29",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.4069,
+        0.6931,
+        -1.3974
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 1,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 19,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:23:41",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.4553,
+        0.8138,
+        -1.692
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 1,
+        "circle": 0,
+        "idle": 0
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:38:14",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.4553,
+        0.8138,
+        -1.692
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 74,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:42:21",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.9858,
+        0.8869,
+        -2.1281
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 0,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:45:43",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.9858,
+        0.8869,
+        -2.1281
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 25,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:48:26",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.7676,
+        1.0737,
+        -1.4654
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 0,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 0,
+      "skipped_this_run": 0
+    },
+    {
+      "date": "2026-11-03T14:50:53",
+      "participant": "aravindh",
+      "firmware_header": "#READY,rate=100,acc=4g,gyro=1000dps,fw=1.0",
+      "gyro_bias_dps": [
+        2.7676,
+        1.0737,
+        -1.4654
+      ],
+      "fake": false,
+      "config": {
+        "reps": 25,
+        "mode": "motion",
+        "window_s": 5.0,
+        "countdown_s": 3.0,
+        "shuffle": false,
+        "camera": true,
+        "save_video": false,
+        "start_dps": 80.0,
+        "stop_dps": 40.0,
+        "stop_hold_s": 0.3,
+        "preroll_s": 0.2,
+        "min_duration_s": 0.25,
+        "max_duration_s": 3.0,
+        "idle_window_s": 2.0,
+        "nominal_rate_hz": 100.0
+      },
+      "counts": {
+        "vertical_swipe": 25,
+        "horizontal_swipe": 25,
+        "zigzag": 25,
+        "circle": 25,
+        "idle": 25
+      },
+      "kept_this_run": 25,
+      "skipped_this_run": 0
+    }
+  ]
+}
