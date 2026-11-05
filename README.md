@@ -432,3 +432,13 @@ wandering squiggle for idle).
    on without crashing.
 6. Delete the throwaway data when you are done:
    `rm -rf data/test && ` remove its rows from `data/index.csv`.
+
+## Run the Unity scene on your computer
+
+1. Install **Unity Hub** and Unity Editor **6000.6.4f1**. Android Build Support is only needed if you plan to build for Quest.
+2. Download this repository (or run `git clone https://github.com/Qasim1507/CEG5205-wand.git`).
+3. In Unity Hub, choose **Add project from disk** and select the **`unity`** folder inside the downloaded repository. Open it and let Unity finish importing packages.
+4. In the Unity Project window, open **`Assets/Scenes/WandSpellsMeetingDemo.unity`**, then press **Play**.
+5. Press **1**, **2**, or **3** to choose a wand. In the arena, move the mouse to aim and **left-click** to shoot the active crystal. Press **R** to recenter the crosshair or **Esc** to release the mouse.
+
+The desktop scene runs without an IMU or Quest headset. The included Quest APK is at `unity/Builds/WandSpellsMeetingDemo.apk`; headset controls and live IMU model integration still need testing and connection.
