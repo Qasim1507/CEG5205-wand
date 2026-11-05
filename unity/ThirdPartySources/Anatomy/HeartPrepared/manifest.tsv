@@ -1,0 +1,24 @@
+00	Ascending aorta leftward arch descending aorta	00
+01	Brachiocephalic arterial trunk	00
+02	Circumflex coronary branch	00
+03	Inferior vena cava returning to right atrium	01
+04	Left anterior interventricular coronary artery	00
+05	Left atrium posterior body	02
+06	Left auricular appendage	03
+07	Left common carotid origin	00
+08	Left coronary ostium from aortic root	00
+09	Left inferior pulmonary vein oxygen-rich	00
+10	Left pulmonary artery oxygen-poor	01
+11	Left subclavian origin	00
+12	Left superior pulmonary vein oxygen-rich	00
+13	Left ventricle tapering to leftward apex	03
+14	Pulmonary trunk from right ventricle	01
+15	Right atrium and auricular outline	02
+16	Right auricular appendage	03
+17	Right coronary artery around ventricular surface	00
+18	Right coronary ostium from aortic root	00
+19	Right inferior pulmonary vein oxygen-rich	00
+20	Right pulmonary artery oxygen-poor	01
+21	Right superior pulmonary vein oxygen-rich	00
+22	Right ventricle anterior crescent	03
+23	Superior vena cava returning to right atrium	01

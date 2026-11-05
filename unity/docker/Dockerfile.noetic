@@ -1,0 +1,36 @@
+FROM ros:noetic-ros-base-focal
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_WORKSPACE=/catkin_ws
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dos2unix \
+    iputils-ping \
+    net-tools \
+    python-is-python3 \
+    python3-jsonpickle \
+    python3-rospkg \
+    ros-noetic-robot-state-publisher \
+    ros-noetic-moveit \
+    ros-noetic-rosbridge-suite \
+    ros-noetic-joy \
+    ros-noetic-ros-control \
+    ros-noetic-ros-controllers \
+    ros-noetic-tf2-web-republisher \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ROS/src/moveit_msgs $ROS_WORKSPACE/src/moveit_msgs
+COPY ROS/src/niryo_moveit $ROS_WORKSPACE/src/niryo_moveit
+COPY ROS/src/niryo_one_ros $ROS_WORKSPACE/src/niryo_one_ros
+COPY ROS/src/niryo_one_urdf $ROS_WORKSPACE/src/niryo_one_urdf
+COPY ROS/src/ros_tcp_endpoint $ROS_WORKSPACE/src/ros_tcp_endpoint
+
+COPY docker/tutorial /tutorial
+
+RUN find $ROS_WORKSPACE -type f -print0 | xargs -0 dos2unix \
+    && dos2unix /tutorial \
+    && chmod +x /tutorial $ROS_WORKSPACE/src/niryo_moveit/scripts/*.py \
+    && /bin/bash -c 'source /opt/ros/noetic/setup.bash && cd /catkin_ws && catkin_make'
+
+WORKDIR $ROS_WORKSPACE
+ENTRYPOINT ["/tutorial"]

@@ -1,0 +1,34 @@
+# Unity-generated caches and local editor state
+/Library/
+/Temp/
+/Logs/
+/Obj/
+/UserSettings/
+/.utmp/
+/.vs/
+/.vscode/
+
+# Generated IDE files
+*.csproj
+*.sln
+*.slnx
+*.user
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# OS and editor temporary files
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.swp
+
+# APKs are reproducible. Keep the current wand build for team testing.
+/Builds/*
+!/Builds/WandSpellsMeetingDemo.apk
+
+# Local command output
+/build/

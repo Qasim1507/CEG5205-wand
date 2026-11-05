@@ -1,5 +1,19 @@
 # CEG5205 wand - IMU gesture data collection
 
+## Unity scene
+
+The Unity 6 project is in [`unity/`](unity/). Open that folder in Unity Hub with
+Unity **6000.6.4f1**, then open
+`unity/Assets/Scenes/WandSpellsMeetingDemo.unity`. See
+[`unity/WAND_SPELLS_MEETING.md`](unity/WAND_SPELLS_MEETING.md) for desktop controls,
+the Quest APK, and the current integration status. Unity's generated caches are
+excluded from Git; the included `Assets`, `Packages`, and `ProjectSettings`
+folders are what Unity needs to import the project.
+
+The Unity scene currently accepts demo UDP spell messages. It is not yet wired
+to the trained IMU classifier in this repository, and headset interaction still
+needs testing on a Quest.
+
 Sensor side of the mixed-reality wand project: an MPU-6050 on the wand streams
 to an Arduino Mega over I2C, the Mega streams ASCII lines to a MacBook over
 USB, and Python records labelled gesture samples for the ML classifier.

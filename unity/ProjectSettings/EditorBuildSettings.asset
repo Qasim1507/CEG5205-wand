@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/Part1DoneScene.unity
+    guid: 510e3a95eca75c34b909dae26f12922e
+  - enabled: 1
+    path: Assets/Scenes/Part2RosTopic.unity
+    guid: 7f36e80ea3347f44a8aba310bb45abcd
+  - enabled: 1
+    path: Assets/Scenes/PickAndPlaceAutomatic.unity
+    guid: c996f67ba8a5f61468ee9ad716c30fe1
+  - enabled: 1
+    path: Assets/Scenes/Part4SimAndReal.unity
+    guid: 8cf285b7678ecb84189713b3cdd2922c
+  - enabled: 1
+    path: Assets/Tests/PlayMode/PlayModeTestScenes/TargetPlacementTest.unity
+    guid: 3d328f38f71b71e47bb8d96869012ffe
+  - enabled: 1
+    path: Assets/Scenes/MultiBoxSorting.unity
+    guid: 74289a9c48a540643b447772710faf2b
+  - enabled: 1
+    path: Assets/Scenes/DesktopHandTarget.unity
+    guid: 82a945ad920e60b4392372da7311fdc0
+  - enabled: 1
+    path: Assets/Scenes/QuestRobotViewer.unity
+    guid: 77fb5e5f008c5d1438c9904a83415753
+  - enabled: 1
+    path: Assets/Scenes/QuestHandTracking.unity
+    guid: 9c12b8d0295d55a4ca45aeecc9b09bf3
+  - enabled: 1
+    path: Assets/Scenes/QuestRealHands.unity
+    guid: 71b3cc662a43c4e90a0aa9782f6edfeb
+  - enabled: 1
+    path: Assets/Scenes/QuestHandRobotControl.unity
+    guid: 82b177fc89dd845a698c3407620fbec7
+  - enabled: 1
+    path: Assets/Scenes/QuestSurgeryGame.unity
+    guid: b6fb3c3edbb2844ac8a916c2d8470e33
+  m_configObjects:
+    com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: d4757318ca820b743bd4fdb1d66fe7e8, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: fea1bc6b52a4cdd4abae5dd2189fbfd6, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 686a3d404641b4c49b1396f3411e81d5, type: 2}

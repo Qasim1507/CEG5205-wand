@@ -1,0 +1,3 @@
+NiryoMoveitJoints joints_input
+geometry_msgs/Pose pick_pose
+geometry_msgs/Pose place_pose
