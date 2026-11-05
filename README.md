@@ -135,6 +135,32 @@ Collection is **resumable**: re-running the same participant continues from the
 counts already on disk. If the USB cable is pulled the app shows "reconnecting",
 waits for `#READY` again, recalibrates, and carries on.
 
+### Augmented training data
+
+Run `python/augment_dataset.py` to generate repetitions 26–100 for each gesture
+of each participant except Jay, whose 100-per-gesture set was already present.
+Each of the 25 recorded repetitions supplies three variants, using a distinct
+deterministic seed. The script makes small, smooth timing changes (up to 7%
+duration and 3.5% local bend), 3% channel gain changes, small baseline offsets,
+and smoothed sensor noise. It keeps the IMU axes fixed and clips to sensor
+limits. Re-running it leaves existing CSVs untouched.
+
+Generated rows have `mode=augmented` in `data/index.csv`.
+`data/augmentation_manifest.csv` gives each generated file's recorded source,
+random seed, and transformation parameters. The generated `seq` column is a
+sample counter, not a hardware packet sequence. Arun and Sujyot had recorded
+CSVs missing from the index; those are indexed with blank capture timestamps
+and packet-loss fields because that metadata is unavailable. Earlier
+Windows-style index paths are normalized to forward slashes.
+
+There are 100 CSVs per gesture and 500 per participant. These are still only
+25 independent recordings per gesture for each newly augmented participant.
+Split by participant or recorded source before augmentation; never put an
+augmented trace and its source in different train/test folds. For an unbiased
+final evaluation, use held-out recorded traces or held-out participants, not
+augmented traces as independent test observations. Jay's existing augmented
+files predate this manifest and are not attributed to source recordings here.
+
 ## 6. Collecting a real dataset
 
 Follow this once per session. Steps 1 and 2 only matter the first time, or
