@@ -247,7 +247,101 @@ out for testing.
 | gyro peaks pinned near 1000 deg/s | the swipes are saturating the range; see `GYRO_CONFIG` in the sketch |
 | traces look like noise | the axis mapping is wrong - go back to step 1 |
 
-## 7. Notes
+## 7. Training and live recognition
+
+Two scripts, both run from `python/`. Training compares several classifiers and
+keeps only the winner; the demo loads that winner.
+
+### Train
+
+```bash
+python train_gestures.py
+```
+
+It reads `data/index.csv`, builds 142 features per sample
+(`gesture_features.py`), and fits every model in `build_models()` over the same
+folds:
+
+| model | what it is |
+| --- | --- |
+| `logreg` | multinomial logistic regression on scaled features |
+| `svm_rbf` | RBF-kernel SVM, probability-calibrated |
+| `knn` | 7 nearest neighbours, distance-weighted |
+| `random_forest` | 400 trees |
+| `extra_trees` | 400 randomised trees |
+| `hist_gb` | histogram gradient boosting |
+| `mlp` | 128-64 neural net with early stopping |
+
+The comparison table is the output that matters. The winner (highest accuracy,
+macro-F1 breaking ties) is refitted on everything and saved to
+`models/gesture_model.joblib`, with `models/gesture_model_confusion.png`
+alongside it for the report.
+
+Useful flags:
+
+```bash
+python train_gestures.py --dry-run             # report the dataset, fit nothing
+python train_gestures.py --real-only           # recorded samples only
+python train_gestures.py --models svm_rbf,random_forest
+python train_gestures.py --keep-all            # include the excluded classes
+```
+
+### How the dataset is handled
+
+Three known problems in `data/` are dealt with in the loader, so nobody has to
+edit anyone else's CSVs:
+
+- **Jay's repetitions 26-100 are augmented but recorded as `mode=motion`** and
+  are absent from the manifest. The `mode` column is therefore not trusted: a
+  row counts as augmented if the manifest lists it *or* its CSV restarts `seq`
+  at 0, which only the augmenter does.
+- **devam's `idle` recordings contain vigorous movement** - more total rotation
+  than his own swipes, and 21 of 25 would fire the live motion trigger. They
+  teach the model that a hard swing means "cast nothing", so they are dropped
+  by default (`EXCLUDED_CLASSES`, re-enable with `--keep-all`).
+- **An augmented trace must never be scored against the recording it came
+  from.** Folds are grouped by participant, which keeps every derived trace
+  with its source automatically.
+
+With two or more people the split is leave-one-participant-out: train on
+everyone else, test on the person held out. That is the only number worth
+putting in the report, and the script prints what it means next to it. With one
+participant it falls back to grouping by source recording and says plainly that
+the result does not predict how the model handles someone new.
+
+### Live demo
+
+```bash
+python live_predict.py --camera
+```
+
+It uses the same motion trigger as `collect.py`, so a live movement is cut the
+same way a training sample was. Each finished movement gets a predicted spell,
+a confidence, and a bar per class. Below `--min-confidence` (default 0.55) it
+shows "unsure" and casts nothing.
+
+| key | does |
+| --- | --- |
+| `1`-`5` | tag what the last gesture really was |
+| `C` | clear the trace |
+| `Q` / Esc | quit and print the summary |
+
+Tagging is what makes a demo run measurable: the summary prints live accuracy
+over everything tagged, and lists what it got wrong. Every segment is saved to
+`data/_live/` with its trace PNG, plus `live_log.csv` for the whole run, so a
+bad run can be looked at afterwards instead of guessed about.
+
+```bash
+python live_predict.py --fake            # no hardware
+python live_predict.py --min-confidence 0.40
+python live_predict.py --no-log
+```
+
+If the webcam does not open, the demo keeps running on a plain background and
+says so - on macOS grant camera access under System Settings > Privacy &
+Security > Camera.
+
+## 8. Notes
 
 - The 2D trace is an "air mouse": it integrates the **gyro** rates once.
   Acceleration is never double-integrated into position - that drifts away
@@ -266,7 +360,7 @@ out for testing.
 - The first time you use `--camera`, macOS asks for camera permission for your
   terminal app: System Settings > Privacy & Security > Camera.
 
-## 8. Test plan
+## 9. Test plan
 
 ### Step 1 - Arduino alone, in the Serial Monitor
 
