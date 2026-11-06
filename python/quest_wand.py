@@ -3,23 +3,14 @@
 import argparse
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 import time
 
 from unity_bridge import UnityBridge
+from wand_tools import find_adb, authorized_devices
 
 PACKAGE = "com.ceg5205.wandspellsdemo"
-
-
-def find_adb():
-    candidates = [shutil.which("adb"),
-                  str(Path.home() / "Library/Android/sdk/platform-tools/adb"),
-                  str(Path.home() / "Documents/CEG5205-wand-local/tools/platform-tools/adb")]
-    candidates += [str(p) for p in Path("/Applications/Unity/Hub/Editor").glob(
-        "*/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb")]
-    return next((p for p in candidates if p and Path(p).is_file()), None)
 
 
 def main():
@@ -32,8 +23,7 @@ def main():
     adb = find_adb()
     device = args.device
     if adb:
-        listing = subprocess.check_output([adb, "devices"], text=True)
-        devices = re.findall(r"^(\S+)\s+device$", listing, re.MULTILINE)
+        devices = authorized_devices(adb)
         if device is None and len(devices) == 1:
             device = devices[0]
     command = [adb, "-s", device] if adb and device else None

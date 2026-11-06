@@ -1,30 +1,137 @@
-# CEG5205 wand - IMU gesture data collection
+# CEG5205 — IMU Wand Spellcasting on Meta Quest 3
 
-## Unity scene
+Move a physical IMU wand to rotate a virtual wand and cast spells in a Quest 3
+wizard game. A trained classifier runs on the laptop; the Quest runs the included
+Unity Android app. The repository also contains the recording and training tools.
 
-The Unity 6 project is in [`unity/`](unity/). Open that folder in Unity Hub with
-Unity **6000.6.4f1**, then open
-`unity/Assets/Scenes/WandSpellsMeetingDemo.unity`. See
-[`unity/WAND_SPELLS_MEETING.md`](unity/WAND_SPELLS_MEETING.md) for desktop controls,
-the Quest APK, and the current integration status. Unity's generated caches are
-excluded from Git; the included `Assets`, `Packages`, and `ProjectSettings`
-folders are what Unity needs to import the project.
-
-For the complete Arduino -> laptop model -> Quest Wi-Fi setup, see
-[`LAPTOP_QUEST.md`](LAPTOP_QUEST.md). On the configured Mac, double-click
-**Start Quest Wand.command**. Quest uses head gaze to choose a wand and the
-physical IMU gestures to cast spells at the active crystal.
-
-Sensor side of the mixed-reality wand project: an MPU-6050 on the wand streams
-to an Arduino Mega over I2C, the Mega streams ASCII lines to a MacBook over
-USB, and Python records labelled gesture samples for the ML classifier.
-
+```text
+MPU-6050 → Arduino Mega → USB → laptop Python → Wi-Fi → Quest 3
+                                live rotation + recognized spells
 ```
-MPU-6050 --I2C--> Arduino Mega 2560 --USB--> MacBook (Python)
-                                               live_plot.py    (Task 1 demo)
-                                               collect.py      (dataset)
-                                               check_dataset.py (sanity check)
+
+## Quick start: play the game
+
+### What you need
+
+- **Mac or Windows laptop** with internet for the initial setup.
+- **64-bit Python 3.12, 3.13 or 3.14** from [python.org](https://www.python.org/downloads/).
+  On Windows, enable **Add Python to PATH** if the installer offers it.
+- **Arduino Mega + MPU-6050 wand**, connected to the laptop by USB, running
+  [`arduino/wand_imu/wand_imu.ino`](arduino/wand_imu/wand_imu.ino).
+  For a new board, follow [wiring](#1-wiring) and [firmware upload](#2-flash-the-arduino) below.
+- **Meta Quest 3**, with developer mode enabled and a USB data cable to the laptop.
+- Laptop and Quest on the **same Wi-Fi**. Close Arduino Serial Monitor and any
+  other recording/recognition program before starting.
+
+The trained model and ready-to-install Quest APK are included. **Unity is only
+needed if you want to edit the game or build a new APK.**
+
+### First-time setup
+
+1. Download this repository with **Code → Download ZIP** and extract it, or clone
+   `https://github.com/Qasim1507/CEG5205-wand.git`. Open the extracted repo folder.
+2. Connect Quest by USB. Put it on and accept **Allow USB debugging**; select
+   **Always allow from this computer** if shown.
+3. Run the setup file for your laptop:
+
+| Laptop | Run once to set up | Run each time to play |
+| --- | --- | --- |
+| macOS | Double-click **Setup Quest Wand.command** | Double-click **Start Quest Wand.command** |
+| Windows | Double-click **Setup Quest Wand.cmd** | Double-click **Start Quest Wand.cmd** |
+
+Setup creates `.venv`, installs the Python dependencies, checks the included model,
+finds Android connection tools or downloads them from Google's official server,
+and installs/updates the included APK on one authorized USB headset.
+It keeps downloaded tools inside ignored `.tools/`; no Android Studio installation
+or manual PATH changes are needed for those tools.
+
+If setup reports **QUEST INSTALLATION IS STILL PENDING**, the laptop setup is done
+but the headset is not ready. Accept its USB debugging prompt, then run setup again.
+Keep the folder after setup: the launchers use the files inside it. If you move it
+to another computer, run setup there to create that computer's environment.
+
+**Mac if double-clicking fails:** open Terminal in the repo folder and run:
+
+```bash
+python3 setup_wand.py
 ```
+
+**Windows terminal alternative:** open Command Prompt in the repo folder and run:
+
+```bat
+py -3 setup_wand.py
+```
+
+If Python is already installed but that command selects an older version, choose
+the installed supported version explicitly, e.g. `python3.14 setup_wand.py` on Mac
+or `py -3.14 setup_wand.py` on Windows.
+
+### Every time you play
+
+1. Connect the Arduino by USB. Keep the Quest USB cable connected for automatic
+   headset detection and game launch; game data travels over Wi-Fi.
+2. Put the wand on the table, then double-click your **Start Quest Wand** file.
+3. Wait for calibration to finish and the live recognition window to appear.
+   Look for **Quest link: CONNECTED**. Calibration retries if the wand moves.
+4. In Quest, look at a displayed wand for **1.2 seconds** to select it and enter
+   the arena. Pick up the physical wand, perform a gesture, then pause briefly.
+5. To recenter, point the physical wand forward and press **R** in the laptop
+   recognition window, or **A/X** on a Quest controller. Quit with **Q/Esc** in
+   the laptop window or **Ctrl+C** in its terminal.
+
+The wand follows tilt and swing continuously, including between casts. Its grip
+stays at a fixed offset from the view; the IMU does not measure room position.
+Sensor spells hit the current glowing crystal automatically. After five crystals,
+the arena resets. See [the integration guide](LAPTOP_QUEST.md) for gesture/effect
+mapping, rotation details, logs and advanced options.
+
+### Manual launch / useful options
+
+Run these from the repo folder; virtual-environment activation is optional.
+
+| Task | macOS | Windows (Command Prompt) |
+| --- | --- | --- |
+| Start game + recognition | `.venv/bin/python python/quest_wand.py` | `.venv\Scripts\python.exe python\quest_wand.py` |
+| Check Quest connection only | `.venv/bin/python python/quest_wand.py --check` | `.venv\Scripts\python.exe python\quest_wand.py --check` |
+| Choose Arduino port | Add `--port /dev/cu.usbmodemXXXX` | Add `--port COM3` (use your actual port) |
+| Set up without changing the headset | `python3 setup_wand.py --skip-apk` | `py -3 setup_wand.py --skip-apk` |
+
+Once the app is installed, you can disconnect Quest USB, open **Wand Spells MR**
+in Quest's **Unknown Sources** apps, and use `--quest-ip YOUR_QUEST_WIFI_IP --no-launch`
+on the launch command. The Arduino must stay connected to the laptop.
+
+### Troubleshooting setup and play
+
+| What you see | What to do |
+| --- | --- |
+| Python missing / too old | Install the supported Python version above, then rerun setup. |
+| Mac refuses to open a `.command` file | Use the Terminal alternatives above; for launch use `.venv/bin/python python/quest_wand.py`. |
+| Python packages fail to download | Check internet, use 64-bit Python 3.12–3.14, and rerun setup. The included model uses scikit-learn 1.9.1, pinned in requirements. |
+| Quest unauthorized / installation pending | Wear the headset, accept USB debugging, then rerun setup. Try a USB data cable rather than a charge-only cable. |
+| More than one Android device connected | Disconnect the others, or pass `--device SERIAL` to setup and launch. |
+| APK signature mismatch on install | Ask the team which build to keep; an app installed with another signing key cannot be updated directly. Setup does not uninstall it or erase its data. |
+| Arduino not found / port busy | Close Serial Monitor and other Python runs. Check the USB cable, board driver and actual COM/serial port. |
+| No `#READY` header | Upload the supplied Mega firmware using Arduino IDE; setup installs laptop software, while firmware upload is a separate step. |
+| Calibration retries repeatedly | Leave the wand resting on the table until the live window appears. |
+| No Quest reply / disconnected | Keep the game open and headset awake. Check both devices share Wi-Fi; a campus/guest network may isolate devices. Try a shared hotspot/private router. |
+| Windows firewall blocks the connection | Allow the Python app on the private network you use for the demo, then retry `--check`. |
+| Wand direction drifts | Point forward and recenter with R or A/X. |
+
+Mac + Quest hardware playback is verified. Windows launchers and discovery are
+provided, but still need verification on a Windows laptop with the actual hardware.
+
+## Editing the Unity game
+
+Open [`unity/`](unity/) in Unity Hub with **6000.6.4f1**, then open
+`Assets/Scenes/WandSpellsMeetingDemo.unity`. Install **Android Build Support**,
+including SDK, NDK and OpenJDK, if building for Quest. Use
+**Tools → Wand Spells → Build Quest APK**, then rerun setup to install the new APK.
+See [Unity scene instructions](unity/WAND_SPELLS_MEETING.md) for desktop controls.
+
+## Data collection and training reference
+
+The remaining sections explain wiring, recording and training. They are optional
+for playing with the included trained model.
 
 ## Gestures
 
@@ -72,7 +179,10 @@ Commands you can type in the Serial Monitor: `R` resend header, `P` pause,
 **Close the Serial Monitor before running the Python scripts** - only one
 program can hold the serial port.
 
-## 3. Python setup (Python 3.10+, macOS)
+## 3. Python setup for data collection
+
+The quick-start setup script above also installs the data-collection dependencies.
+For manual setup on macOS:
 
 ```bash
 cd CEG5205-wand
@@ -80,6 +190,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r python/requirements.txt
 ```
+
+On Windows use `py -3 -m venv .venv`, then
+`.venv\Scripts\python.exe -m pip install -r python\requirements.txt`.
+To run the utilities below, activate with `.venv\Scripts\activate.bat` in Command
+Prompt, or call that environment's Python executable directly.
 
 ## 4. Running
 
@@ -442,4 +557,6 @@ wandering squiggle for idle).
 4. In the Unity Project window, open **`Assets/Scenes/WandSpellsMeetingDemo.unity`**, then press **Play**.
 5. Press **1**, **2**, or **3** to choose a wand. In the arena, move the mouse to aim and **left-click** to shoot the active crystal. Press **R** to recenter the crosshair or **Esc** to release the mouse.
 
-The desktop scene runs without an IMU or Quest headset. The included Quest APK is at `unity/Builds/WandSpellsMeetingDemo.apk`; headset controls and live IMU model integration still need testing and connection.
+The desktop scene runs without an IMU or Quest headset. The included Quest APK is
+at `unity/Builds/WandSpellsMeetingDemo.apk`; live IMU gestures, continuous rotation,
+and Quest gaze selection are connected. Use the quick start above to play on Quest.

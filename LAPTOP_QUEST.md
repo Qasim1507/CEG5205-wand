@@ -7,20 +7,21 @@ There is no Quest Link/PC VR requirement, and no Arduino USB plugin on Quest.
 
 ## First setup
 
-1. Open `unity/` with Unity **6000.6.4f1**, including Android Build Support,
-   SDK, NDK and OpenJDK. Build with **Tools > Wand Spells > Build Quest APK**.
-   This uses the existing scene, enables Android internet permission, and writes
-   `unity/Builds/WandSpellsMeetingDemo.apk`.
-2. Enable Quest developer mode and accept its USB debugging prompt. Install:
-   `adb install -r unity/Builds/WandSpellsMeetingDemo.apk`.
-3. Create the Python environment and install dependencies if needed:
-   `python3 -m venv .venv`, then `.venv/bin/python -m pip install -r python/requirements.txt`.
-4. Put laptop and Quest on the same Wi-Fi. Campus or guest networks may isolate
+1. Follow the [README quick start](README.md#quick-start-play-the-game): install
+   Python 3.12–3.14, connect the Quest by USB and accept USB debugging, then run
+   **Setup Quest Wand.command** (Mac) or **Setup Quest Wand.cmd** (Windows).
+   Setup installs dependencies, locates/downloads Android tools, and installs the
+   included `unity/Builds/WandSpellsMeetingDemo.apk`. Unity is optional for playing.
+2. For scene changes, open `unity/` with Unity **6000.6.4f1** plus Android Build
+   Support, SDK, NDK and OpenJDK. Build with **Tools > Wand Spells > Build Quest APK**,
+   then rerun setup to install the rebuilt app.
+3. Put laptop and Quest on the same Wi-Fi. Campus or guest networks may isolate
    devices; use a shared hotspot/private router if the game never replies.
 
-## Run the demo on this Mac
+## Run the demo
 
-Double-click **Start Quest Wand.command**. It finds the authorized USB Quest,
+Double-click **Start Quest Wand.command** on Mac or **Start Quest Wand.cmd** on Windows.
+It finds the authorized USB Quest,
 launches Wand Spells, obtains its Wi-Fi IP, and starts the live predictor.
 Keep the physical wand completely still during the initial calibration.
 If movement interrupts calibration, startup retries automatically up to ten times.

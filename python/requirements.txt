@@ -1,9 +1,9 @@
-# CEG5205 wand - Python dependencies (Python 3.10+, macOS)
+# CEG5205 wand - Python dependencies (Python 3.12+, macOS / Windows)
 pyserial>=3.5
 numpy>=1.24
 pandas>=2.0
 opencv-python>=4.8
 pyqtgraph>=0.13
 PyQt6>=6.5
-scikit-learn>=1.3
+scikit-learn==1.9.1
 joblib>=1.3
