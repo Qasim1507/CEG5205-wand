@@ -4,6 +4,8 @@
 /Logs/
 /Obj/
 /UserSettings/
+/Assets/CompositionLayers/UserSettings/
+/Assets/CompositionLayers/UserSettings.meta
 /.utmp/
 /.vs/
 /.vscode/

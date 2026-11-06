@@ -10,9 +10,10 @@ the Quest APK, and the current integration status. Unity's generated caches are
 excluded from Git; the included `Assets`, `Packages`, and `ProjectSettings`
 folders are what Unity needs to import the project.
 
-The Unity scene currently accepts demo UDP spell messages. It is not yet wired
-to the trained IMU classifier in this repository, and headset interaction still
-needs testing on a Quest.
+For the complete Arduino -> laptop model -> Quest Wi-Fi setup, see
+[`LAPTOP_QUEST.md`](LAPTOP_QUEST.md). On the configured Mac, double-click
+**Start Quest Wand.command**. Quest uses head gaze to choose a wand and the
+physical IMU gestures to cast spells at the active crystal.
 
 Sensor side of the mixed-reality wand project: an MPU-6050 on the wand streams
 to an Arduino Mega over I2C, the Mega streams ASCII lines to a MacBook over

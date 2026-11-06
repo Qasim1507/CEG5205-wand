@@ -371,6 +371,7 @@ public static class WandSpellsMeetingSceneBuilder
     public static void BuildAndroid()
     {
         QuestViewSetup.ConfigureProject();
+        PlayerSettings.Android.forceInternetPermission = true;
         if (!System.IO.File.Exists(ScenePath)) BuildScene();
         var previousId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
         var previousName = PlayerSettings.productName;

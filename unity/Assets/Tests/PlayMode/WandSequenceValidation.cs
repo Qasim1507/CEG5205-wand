@@ -8,6 +8,60 @@ using UnityEngine.TestTools;
 
 public class WandSequenceValidation
 {
+    [UnityTest]
+    public IEnumerator UdpAcknowledgesReadinessAndRejectsDuplicateCastIds()
+    {
+        var root = new GameObject("udp bridge test");
+        var type = Type.GetType("WandSpellDemoController, Assembly-CSharp");
+        var controller = root.AddComponent(type);
+        type.GetField("targets").SetValue(controller, new Transform[0]);
+        type.GetField("udpPort").SetValue(controller, 0);
+        var wand = new GameObject("pose test wand").transform;
+        wand.SetParent(root.transform);
+        type.GetField("wand").SetValue(controller, wand);
+        yield return null;
+        var receiver = (System.Net.Sockets.UdpClient)type.GetField("receiver",
+            BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller);
+        var port = ((System.Net.IPEndPoint)receiver.Client.LocalEndPoint).Port;
+        using (var client = new System.Net.Sockets.UdpClient())
+        {
+            client.Connect("127.0.0.1", port);
+            string[] packets = {
+                "{\"type\":\"ping\",\"session\":\"test\"}",
+                "{\"type\":\"cast\",\"session\":\"test\",\"id\":1,\"spell\":\"fire\",\"conf\":0.9}",
+                "{\"type\":\"cast\",\"session\":\"test\",\"id\":1,\"spell\":\"fire\",\"conf\":0.9}" };
+            string[] expected = { "choose_wand", "ignored_not_ready_busy_or_invalid", "duplicate" };
+            for (int i = 0; i < packets.Length; i++)
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(packets[i]);
+                client.Send(bytes, bytes.Length);
+                var deadline = Time.realtimeSinceStartup + 2f;
+                while (client.Available == 0 && Time.realtimeSinceStartup < deadline) yield return null;
+                Assert.Greater(client.Available, 0, "No Unity acknowledgement");
+                var endpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0);
+                var reply = System.Text.Encoding.UTF8.GetString(client.Receive(ref endpoint));
+                StringAssert.Contains(expected[i], reply);
+                StringAssert.Contains("test", reply);
+            }
+            type.GetField("arenaReady", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, true);
+            string[] poses = {
+                "{\"type\":\"pose\",\"session\":\"test\",\"pose_id\":1,\"q\":[1,0,0,0]}",
+                "{\"type\":\"pose\",\"session\":\"test\",\"pose_id\":2,\"q\":[0.7071068,0,0.7071068,0]}",
+                "{\"type\":\"pose\",\"session\":\"test\",\"pose_id\":1,\"q\":[1,0,0,0]}" };
+            foreach (var pose in poses)
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(pose);
+                client.Send(bytes, bytes.Length);
+                yield return new WaitForSeconds(.2f);
+            }
+            Assert.Greater(Quaternion.Angle(Quaternion.identity, wand.rotation), 80f,
+                "Pose must rotate the wand; stale pose must not reset it");
+            Assert.AreEqual(2, type.GetField("poseCount", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller));
+        }
+        UnityEngine.Object.Destroy(root);
+        yield return null;
+    }
+
     [Test]
     public void AimingAcceptsOnlyCurrentCrystal()
     {

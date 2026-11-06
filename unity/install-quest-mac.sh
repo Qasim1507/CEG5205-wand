@@ -2,10 +2,11 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-case "${1:-hands}" in
+case "${1:-wand}" in
+  wand) apk="Builds/WandSpellsMeetingDemo.apk" ;;
   hands) apk="Builds/QuestHandTracking.apk" ;;
   viewer) apk="Builds/QuestRobotViewer.apk" ;;
-  *) echo "Usage: $0 [hands|viewer]" >&2; exit 2 ;;
+  *) echo "Usage: $0 [wand|hands|viewer]" >&2; exit 2 ;;
 esac
 
 unity_adb="/Applications/Unity/Hub/Editor/6000.6.4f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb"

@@ -43,6 +43,8 @@ import pandas as pd
 
 import gesture_features as gf
 import imu_common as imu
+from unity_bridge import UnityBridge
+from wand_orientation import WandOrientation
 # Reusing collect.py's thresholds is deliberate: if the recording trigger and
 # the live trigger ever differ, the model sees segments unlike its training set.
 from collect import (CANVAS_H, CANVAS_W, COL_ACCENT, COL_DIM, COL_OK, COL_REC,
@@ -174,12 +176,16 @@ class LivePredictor:
 
     def __init__(self, model: Model, source: imu.ImuSource,
                  min_confidence: float, log_dir: Path | None,
-                 camera: cv2.VideoCapture | None) -> None:
+                 camera: cv2.VideoCapture | None,
+                 bridge: UnityBridge | None = None,
+                 wand_axes: str = "y,x,-z") -> None:
         self.model = model
         self.source = source
         self.min_confidence = min_confidence
         self.log_dir = log_dir
         self.camera = camera
+        self.bridge = bridge
+        self.orientation = WandOrientation(wand_axes)
 
         self.segmenter = gf.GestureSegmenter(
             start_dps=START_DPS, stop_dps=STOP_DPS, stop_hold_s=STOP_HOLD_S,
@@ -197,18 +203,25 @@ class LivePredictor:
 
     def pump(self) -> None:
         """Drain whatever the reader thread has, and classify completed moves."""
+        if self.bridge is not None:
+            self.bridge.pump()
         if self.source.epoch != self.epoch:
             # The USB cable was replugged: the bias is stale, so start clean.
             self.epoch = self.source.epoch
             self.segmenter.reset()
             self.tracer.reset()
-            self.message = "reconnected - recalibrated"
+            self.orientation.reset()
+            self.message = "reconnected - restart to recalibrate while still"
 
         samples = self.source.drain()
         if not samples:
             return
         self.live_mag = samples[-1].gyro_mag
         self.tracer.feed(samples)
+        for sample in samples:
+            self.orientation.update(sample)
+        if self.bridge is not None:
+            self.bridge.pose(self.orientation.unity_quaternion(), self.orientation.origin)
 
         for segment in self.segmenter.push_many(samples):
             self.classify(segment)
@@ -235,6 +248,9 @@ class LivePredictor:
 
         self.casts.append(cast)
         self.last = cast
+        print(f"Gesture: {cast.label or cast.reason} ({cast.confidence:.0%})", flush=True)
+        if self.bridge is not None:
+            self.bridge.cast(cast, self.min_confidence)
         self.tracer.reset()
         if self.log_dir is not None:
             self.log_segment(cast, t_s, values)
@@ -289,6 +305,7 @@ class LivePredictor:
         confident = [c for c in usable if c.confidence >= self.min_confidence]
         print(f"\n{'=' * 60}\nLIVE RUN SUMMARY\n{'=' * 60}")
         print(f"  model          : {self.model.name}")
+        print(f"  stream         : {self.source.stats().summary()}")
         print(f"  movements seen : {total}")
         print(f"  classified     : {len(usable)}")
         print(f"  above {self.min_confidence:.2f}    : {len(confident)}")
@@ -338,10 +355,18 @@ class LivePredictor:
             put_text(canvas, f"ready   {self.live_mag:5.0f} deg/s",
                      (50, 140), 0.6, COL_DIM, 1)
 
+        if self.bridge is not None:
+            connected = self.bridge.was_connected
+            status = self.bridge.game_status or "waiting for game"
+            put_text(canvas, f"QUEST: {status if connected else 'DISCONNECTED'}",
+                     (50, 185), .55, COL_OK if connected else COL_WARN, 1)
+            put_text(canvas, f"WAND: {self.bridge.pose_count} poses received  "
+                     f"{self.bridge.pose_angle:.0f} deg from neutral", (50, 215), .45, COL_DIM, 1)
+
         imu.draw_path(canvas, self.tracer.path, TRACE_BOX)
         self.draw_result(canvas)
 
-        put_text(canvas, "1-5 tag last    C clear    Q quit",
+        put_text(canvas, "R center wand    1-5 tag    C clear    Q quit",
                  (50, CANVAS_H - 70), 0.5, COL_DIM, 1)
         put_text(canvas, self.message or self.source.stats().summary(),
                  (50, CANVAS_H - 30), 0.45, COL_DIM, 1)
@@ -393,17 +418,25 @@ class LivePredictor:
 
     # -- the loop -----------------------------------------------------------
 
-    def run(self) -> None:
+    def run(self, headless: bool = False, duration: float | None = None) -> None:
         """Show the window until the user quits."""
-        cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
-        while True:
+        if not headless:
+            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
+        started = time.monotonic()
+        while duration is None or time.monotonic() - started < duration:
             self.pump()
+            if headless:
+                time.sleep(.02)
+                continue
             cv2.imshow(WINDOW_NAME, self.render())
             key = cv2.waitKey(20) & 0xFF
             if key in KEYS_QUIT:
                 break
             if key in TAG_KEYS:
                 self.tag_last(TAG_KEYS[key])
+            elif key == ord("r"):
+                self.orientation.reset()
+                self.message = "wand centered - point forward when pressing R"
             elif key == KEY_CLEAR:
                 self.tracer.reset()
                 self.last = None
@@ -445,7 +478,25 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--port", help="serial port, e.g. /dev/cu.usbmodem14101")
     parser.add_argument("--fake", action="store_true",
                         help="synthetic IMU data, no hardware needed")
-    return parser.parse_args(argv)
+    parser.add_argument("--unity-host", help="Quest Wi-Fi IP (or 127.0.0.1 for editor)")
+    parser.add_argument("--wand-axes", default="y,x,-z", help="IMU rotation axes mapped to Unity x,y,z")
+    parser.add_argument("--unity-port", type=int, default=5055)
+    parser.add_argument("--headless", action="store_true", help="run without an overlay window")
+    parser.add_argument("--duration", type=float, help="stop after this many seconds (diagnostics)")
+    args = parser.parse_args(argv)
+    try:
+        WandOrientation(args.wand_axes)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if not 0 <= args.min_confidence <= 1:
+        parser.error("--min-confidence must be between 0 and 1")
+    if not 1 <= args.unity_port <= 65535:
+        parser.error("--unity-port must be between 1 and 65535")
+    if args.duration is not None and args.duration <= 0:
+        parser.error("--duration must be positive")
+    if args.fake and args.unity_host:
+        parser.error("--fake cannot send spells to a real game")
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -475,31 +526,44 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     source = imu.make_source(args.fake, args.port, on_message=lambda m: print(m))
     camera = open_camera(args.camera)
+    bridge = UnityBridge(args.unity_host, args.unity_port) if args.unity_host else None
+    if bridge:
+        print(f"Quest target: {args.unity_host}:{args.unity_port}; waiting for app reply", flush=True)
 
     try:
         with source:
             if not source.wait_connected(timeout=30.0):
                 print("no wand detected - is it plugged in? (or use --fake)")
                 return 1
-            try:
-                bias = imu.calibrate_gyro(source,
-                                          on_message=lambda m: print(m))
-                source.set_bias(bias)
-            except imu.CalibrationError as exc:
-                print(f"calibration failed: {exc}\ncontinuing uncalibrated")
+            for attempt in range(10):
+                try:
+                    imu.calibrate_gyro(source,
+                                       on_status=lambda m: print(m, flush=True))
+                    break
+                except imu.CalibrationError as exc:
+                    print(f"Calibration attempt {attempt + 1}/10: {exc}", flush=True)
+                    print("SET THE WAND DOWN. Retrying in 2 seconds; wait for the live window.", flush=True)
+                    time.sleep(2)
+            else:
+                print("Calibration could not finish. Set the wand down and restart.")
+                return 1
 
             log_dir = None if args.no_log else Path(args.log_dir).expanduser()
             app = LivePredictor(model, source, args.min_confidence,
-                                log_dir, camera)
+                                log_dir, camera, bridge, args.wand_axes)
             source.clear()
             try:
-                app.run()
+                app.run(args.headless, args.duration)
             except KeyboardInterrupt:
                 # Ctrl-C in the terminal is a normal way to stop this, so exit
                 # through the same path as Q and still print the summary.
                 print()
             app.report()
+    except KeyboardInterrupt:
+        return 130
     finally:
+        if bridge:
+            bridge.close()
         if camera is not None:
             camera.release()
         cv2.destroyAllWindows()

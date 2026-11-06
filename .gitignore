@@ -3,5 +3,6 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+/local_runs/
 # Recorded data: keep the folder structure, ignore large video clips
 data/**/*.mp4

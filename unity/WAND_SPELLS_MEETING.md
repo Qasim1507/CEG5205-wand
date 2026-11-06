@@ -8,8 +8,19 @@ Open `Assets/Scenes/WandSpellsMeetingDemo.unity` in Unity 6000.6.4f1 and press *
 
 The arena floor is an animated lava lake with a narrow stone walkway. The crystals are original procedural 3D meshes inspired by the supplied references; no Shutterstock art was copied. The opening hall, gate travel, mouse aim and impact effects are implemented in this Unity scene.
 
-An external Python program can send `{"spell":"fire","conf":0.93}` or any of the five spell names over UDP port **5055**. From the project folder, run `python wand_demo_sender.py arcane` while the Unity scene is playing. UDP sends simulated model predictions; desktop clicks cast a spell on the currently active crystal. Wand choice changes the wand's appearance.
+The laptop's trained IMU classifier now sends completed gestures over UDP port **5055**.
+See [the laptop/Quest guide](../LAPTOP_QUEST.md) for the launcher, setup and gesture mappings.
+Manual packets such as `{"spell":"fire","conf":0.93}` remain supported for diagnostics;
+`wand_demo_sender.py` is a simulated sender, not the live ML integration.
 
-The Android Quest build is `Builds/WandSpellsMeetingDemo.apk`. It compiled, but has **not** been tested on a headset. The scene currently uses a virtual chamber rather than passthrough, and the wand is camera attached. The mouse aiming and clicking controls are desktop controls, not Quest hand/controller controls. No real IMU or trained ML model is connected yet. To meet the project requirement, collect labelled IMU data, train/evaluate a classifier, and send its predictions to port 5055.
+The Android Quest build is `Builds/WandSpellsMeetingDemo.apk`. Install on a USB-authorized
+Quest with `./install-quest-mac.sh wand`. In Quest, look at a displayed wand for
+1.2 seconds to select it, then cast by moving the real IMU wand. The view teleports
+into the arena after the gate opens. Sensor casts automatically hit the active
+crystal, preserving the existing game behaviour. The scene uses a virtual chamber
+rather than passthrough. The virtual grip is camera attached, while its orientation
+follows continuous IMU pose packets. Physical wand position is not tracked. Press
+A/X on a Quest controller (or R in the laptop predictor) to center its direction.
+Mouse aiming/clicking remains available on desktop.
 
 The scene uses an original generated floor texture, [Poly Haven Medieval Blocks 03](https://polyhaven.com/a/medieval_blocks_03) CC0 wall textures, and [Cinzel](https://github.com/google/fonts/tree/main/ofl/cinzel) under the SIL Open Font License. The font license is included in `Assets/WandSpells/Fonts/OFL.txt`.
