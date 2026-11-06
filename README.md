@@ -120,6 +120,48 @@ on the launch command. The Arduino must stay connected to the laptop.
 Mac + Quest hardware playback is verified. Windows launchers and discovery are
 provided, but still need verification on a Windows laptop with the actual hardware.
 
+## Play on your computer with the Arduino (no Quest)
+
+You can play in **Unity Editor** using the physical Arduino/IMU wand. A Quest
+headset and Wi-Fi are not required: Python sends movement and spells to Unity
+on the same computer. This mode uses the editor; a standalone desktop game is
+not included.
+
+1. Install Unity Hub and Unity Editor **6000.6.4f1**. Android Build Support is
+   optional for this mode.
+2. Set up the Python environment using your platform's setup file above. You can
+   skip headset installation with `python3 setup_wand.py --skip-apk` on Mac or
+   `py -3 setup_wand.py --skip-apk` on Windows. If setup says Quest installation
+   is pending, that does not prevent desktop play.
+3. Connect the Arduino by USB and close Serial Monitor/other recognition runs.
+4. In Unity Hub, add the repo's **`unity`** folder as a project. Open
+   **`Assets/Scenes/WandSpellsMeetingDemo.unity`** and press **Play**.
+5. Click the **Game** view and press **1**, **2**, or **3** to choose a wand.
+6. From the repo folder, run the command for your laptop:
+
+**macOS:**
+
+```bash
+.venv/bin/python python/live_predict.py --unity-host 127.0.0.1
+```
+
+**Windows (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\live_predict.py --unity-host 127.0.0.1
+```
+
+Leave the physical wand still until calibration finishes and the live window
+appears. After Unity enters the arena, swing/tilt the wand and perform gestures
+to cast at the active crystal. Point forward and press **R** in the Python window
+to recenter. Focus that window and press **Q/Esc** to stop recognition; stop Play
+mode in Unity when finished.
+
+`127.0.0.1` means this computer. Use the commands above instead of **Start Quest
+Wand**, which looks for a headset. If no connection is reported, check Unity is
+in Play mode with the correct scene and UDP port **5055** is available. You can
+also play with the mouse alone using the desktop controls below.
+
 ## Editing the Unity game
 
 Open [`unity/`](unity/) in Unity Hub with **6000.6.4f1**, then open
@@ -550,6 +592,10 @@ wandering squiggle for idle).
    `rm -rf data/test && ` remove its rows from `data/index.csv`.
 
 ## Run the Unity scene on your computer
+
+For physical wand control without a headset, follow
+[Play on your computer with the Arduino](#play-on-your-computer-with-the-arduino-no-quest)
+above. The steps here describe mouse-only desktop play.
 
 1. Install **Unity Hub** and Unity Editor **6000.6.4f1**. Android Build Support is only needed if you plan to build for Quest.
 2. Download this repository (or run `git clone https://github.com/Qasim1507/CEG5205-wand.git`).
