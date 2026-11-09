@@ -8,8 +8,8 @@ import time
 import uuid
 
 # Keep dataset labels unchanged; translate only at the game boundary.
-GAME_SPELLS = {"fire": "fire", "wind": "arcane", "lightning": "storm",
-               "water": "frost"}
+GAME_SPELLS = {"fire": "fire", "wind": "wind", "lightning": "lightning",
+               "water": "water"}
 
 
 class UnityBridge:

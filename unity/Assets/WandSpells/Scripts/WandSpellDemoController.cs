@@ -13,11 +13,9 @@ using UnityEngine.XR;
 /// Meeting vertical slice. Keyboard is a simulated classifier; the same
 /// CastSpell entry point accepts predictions from the Python IMU model.
 /// </summary>
-public sealed class WandSpellDemoController : MonoBehaviour
-{
+public sealed class WandSpellDemoController : MonoBehaviour {
     [Serializable]
-    sealed class SensorPacket
-    {
+    sealed class SensorPacket {
         public string type;
         public string session;
         public int id;
@@ -28,15 +26,13 @@ public sealed class WandSpellDemoController : MonoBehaviour
         public float[] q;
     }
 
-    sealed class IncomingPacket
-    {
+    sealed class IncomingPacket {
         public string json;
         public IPEndPoint endpoint;
     }
 
     [Serializable]
-    sealed class Reply
-    {
+    sealed class Reply {
         public string type = "ack";
         public string session;
         public int id;
@@ -88,10 +84,13 @@ public sealed class WandSpellDemoController : MonoBehaviour
     bool arenaReady;
     bool[] broken;
     Camera viewCamera;
-    static readonly string[] SpellNames = { "fire", "frost", "storm", "arcane", "shatter" };
+    // The only four spell types accepted by the game and the UDP classifier.
+    static readonly string[] SpellNames = { "fire", "water", "wind", "lightning" };
     static readonly Color[] SpellColors = {
-        new Color(1f,.26f,.04f), new Color(.2f,.8f,1f), new Color(.7f,.3f,1f),
-        new Color(.1f,1f,.7f), new Color(1f,.72f,.2f)
+        new Color(1f, .02f, .02f),   // Fire
+        new Color(.10f, .55f, 1f),   // Water: blue
+        new Color(.02f, .85f, .08f), // Wind
+        new Color(1f, .90f, .12f)    // Lightning: yellow
     };
     float lastSpellTime = -100f;
     Quaternion recenter = Quaternion.identity;
@@ -99,8 +98,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
     Vector2 aimViewport = new Vector2(.5f, .5f);
     bool skipMouseDelta;
 
-    void Start()
-    {
+    void Start() {
         crystalHome = new Vector3[targets.Length];
         broken = new bool[targets.Length];
         for (var i = 0; i < targets.Length; ++i) crystalHome[i] = targets[i].localPosition;
@@ -111,27 +109,23 @@ public sealed class WandSpellDemoController : MonoBehaviour
         if (aimMarker != null) aimMarker.gameObject.SetActive(false);
         if (crosshair != null) crosshair.gameObject.SetActive(false);
         UpdateLabels("CHOOSE A WAND", "");
-        if (scoreText != null)
-        {
+        if (scoreText != null) {
             scoreText.text = "0 / " + targets.Length + " CRYSTALS";
             scoreText.gameObject.SetActive(false);
         }
-        try
-        {
+        try {
             receiver = new UdpClient(udpPort);
             receiver.Client.ReceiveTimeout = 250;
             listening = true;
             reader = new Thread(ReadPackets) { IsBackground = true, Name = "Wand spell UDP" };
             reader.Start();
         }
-        catch (Exception exception)
-        {
+        catch (Exception exception) {
             Debug.LogWarning("Wand UDP input unavailable: " + exception.Message);
         }
     }
 
-    void OnDestroy()
-    {
+    void OnDestroy() {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         listening = false;
@@ -139,19 +133,17 @@ public sealed class WandSpellDemoController : MonoBehaviour
         if (reader != null && reader.IsAlive) reader.Join(300);
     }
 
-    void ReadPackets()
-    {
+    void ReadPackets() {
         var endpoint = new IPEndPoint(IPAddress.Any, 0);
-        while (listening)
-        {
-            try
-            {
+        while (listening) {
+            try {
                 var bytes = receiver.Receive(ref endpoint);
                 var json = Encoding.UTF8.GetString(bytes);
-                lock (incoming)
-                {
+                lock (incoming) {
                     if (incoming.Count < 32) incoming.Enqueue(new IncomingPacket {
-                        json = json, endpoint = new IPEndPoint(endpoint.Address, endpoint.Port) });
+                        json = json,
+                        endpoint = new IPEndPoint(endpoint.Address, endpoint.Port)
+                    });
                 }
             }
             catch (SocketException) { }
@@ -159,8 +151,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         }
     }
 
-    void Update()
-    {
+    void Update() {
         var right = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
         var left = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
         bool rightPressed, leftPressed;
@@ -171,8 +162,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         recenterButtonDown = pressed;
         // The physical wand is the spell input. Head gaze lets Quest users
         // choose a cosmetic wand without a keyboard or a spare controller.
-        if (XRSettings.isDeviceActive && wandStyle < 0 && viewCamera != null)
-        {
+        if (XRSettings.isDeviceActive && wandStyle < 0 && viewCamera != null) {
             int choice = -1;
             RaycastHit hit;
             if (Physics.Raycast(new Ray(viewCamera.transform.position, viewCamera.transform.forward), out hit, 20f))
@@ -183,8 +173,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
                 choiceText.text = choice < 0 ? "LOOK AT A WAND TO SELECT IT" : "KEEP LOOKING TO SELECT WAND " + (choice + 1);
             if (choice >= 0 && Time.time - gazeStarted >= 1.2f) SetWandStyle(choice);
         }
-        for (var i = 0; i < targets.Length; ++i)
-        {
+        for (var i = 0; i < targets.Length; ++i) {
             if (broken[i]) continue;
             targets[i].Rotate(Vector3.up, Time.deltaTime * (24f + i * 7f), Space.World);
             targets[i].localPosition = crystalHome[i] +
@@ -195,40 +184,32 @@ public sealed class WandSpellDemoController : MonoBehaviour
         if (lavaRenderer != null)
             lavaRenderer.material.mainTextureOffset = new Vector2(Time.time * .025f, Time.time * .013f);
         var keyboard = Keyboard.current;
-        if (keyboard != null)
-        {
-            if (wandStyle < 0)
-            {
+        if (keyboard != null) {
+            if (wandStyle < 0) {
                 if (keyboard.digit1Key.wasPressedThisFrame) SetWandStyle(0);
                 if (keyboard.digit2Key.wasPressedThisFrame) SetWandStyle(1);
                 if (keyboard.digit3Key.wasPressedThisFrame) SetWandStyle(2);
             }
-            if (keyboard.rKey.wasPressedThisFrame)
-            {
+            if (keyboard.rKey.wasPressedThisFrame) {
                 RecenterWand();
                 aimViewport = new Vector2(.5f, .5f);
             }
         }
         var mouse = Mouse.current;
-        if (wandStyle < 0 && mouse != null && mouse.leftButton.wasPressedThisFrame && viewCamera != null)
-        {
+        if (wandStyle < 0 && mouse != null && mouse.leftButton.wasPressedThisFrame && viewCamera != null) {
             RaycastHit displayHit;
             if (Physics.Raycast(viewCamera.ScreenPointToRay(mouse.position.ReadValue()), out displayHit, 20f))
                 for (int i = 0; wandDisplays != null && i < wandDisplays.Length; i++)
                     if (displayHit.collider.transform == wandDisplays[i]) { SetWandStyle(i); break; }
         }
-        if (!XRSettings.isDeviceActive && wandStyle >= 0 && arenaReady && mouse != null && viewCamera != null)
-        {
-            if (Cursor.lockState == CursorLockMode.Locked)
-            {
+        if (!XRSettings.isDeviceActive && wandStyle >= 0 && arenaReady && mouse != null && viewCamera != null) {
+            if (Cursor.lockState == CursorLockMode.Locked) {
                 if (skipMouseDelta) skipMouseDelta = false;
                 else aimViewport = AdvanceAim(aimViewport, mouse.delta.ReadValue());
-            }
-            else
+            } else
                 Cursor.visible = true;
             var ray = viewCamera.ViewportPointToRay(new Vector3(aimViewport.x, aimViewport.y, 0f));
-            if (crosshair != null)
-            {
+            if (crosshair != null) {
                 var depth = 1.2f;
                 var halfHeight = Mathf.Tan(viewCamera.fieldOfView * Mathf.Deg2Rad * .5f) * depth;
                 crosshair.localPosition = new Vector3((aimViewport.x - .5f) * 2f * halfHeight * viewCamera.aspect,
@@ -244,57 +225,53 @@ public sealed class WandSpellDemoController : MonoBehaviour
             var localDirection = wand.parent.InverseTransformDirection((aimPoint - wand.position).normalized);
             var desiredRotation = Quaternion.LookRotation(localDirection, Vector3.up);
             wand.localRotation = Quaternion.Slerp(wand.localRotation, desiredRotation, Time.deltaTime * 16f);
-            if (aimMarker != null)
-            {
+            if (aimMarker != null) {
                 aimMarker.gameObject.SetActive(hitCrystal);
                 if (hitCrystal) aimMarker.position = targets[selected].position;
             }
-            if (mouse.leftButton.wasPressedThisFrame && !busy)
-            {
-                if (Cursor.lockState != CursorLockMode.Locked)
-                {
+            if (mouse.leftButton.wasPressedThisFrame && !busy) {
+                if (Cursor.lockState != CursorLockMode.Locked) {
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
                     skipMouseDelta = true;
                 }
-                if (hitCrystal) CastSpell(SpellNames[selected % SpellNames.Length], 1f, "MOUSE AIM");
-                else UpdateLabels("CRYSTAL " + (selected + 1) + " IS ACTIVE", "AIM AT THE GLOWING CRYSTAL");
+                if (hitCrystal) {
+                    // Mouse testing casts the spell configured on the active crystal.
+                    var crystalTarget = targets[selected].GetComponent<CrystalTarget>();
+                    if (crystalTarget != null)
+                        CastSpell(crystalTarget.requiredSpell.ToString().ToLowerInvariant(), 1f, "MOUSE AIM");
+                    else
+                        UpdateLabels("CRYSTAL SETUP MISSING", "ADD CRYSTALTARGET COMPONENT");
+                } else UpdateLabels("CRYSTAL " + (selected + 1) + " IS ACTIVE", "AIM AT THE GLOWING CRYSTAL");
             }
         }
 
-        while (true)
-        {
+        while (true) {
             IncomingPacket message;
-            lock (incoming)
-            {
+            lock (incoming) {
                 if (incoming.Count == 0) break;
                 message = incoming.Dequeue();
             }
-            try
-            {
+            try {
                 var packet = JsonUtility.FromJson<SensorPacket>(message.json);
                 if (packet == null) continue;
-                if (packet.type == "ping")
-                {
+                if (packet.type == "ping") {
                     SendReply(message.endpoint, packet, arenaReady ? "ready" : "choose_wand");
                     continue;
                 }
-                if (packet.type == "pose")
-                {
+                if (packet.type == "pose") {
                     ApplyPose(packet);
                     continue; // Pose updates are frequent; heartbeat reports reception.
                 }
                 // Bridge casts have sequence numbers; old manual packets remain
                 // supported. Never cast a replayed datagram twice.
-                if (packet.type == "cast")
-                {
+                if (packet.type == "cast") {
                     if (string.IsNullOrEmpty(packet.session) || packet.id <= 0) continue;
                     if (activeSession != packet.session) { activeSession = packet.session; lastPacketId = 0; }
                     if (packet.id <= lastPacketId) { SendReply(message.endpoint, packet, "duplicate"); continue; }
                     lastPacketId = packet.id;
                 }
-                if (packet.q != null && packet.q.Length == 4)
-                {
+                if (packet.q != null && packet.q.Length == 4) {
                     var rotation = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
                     var lengthSquared = rotation.x * rotation.x + rotation.y * rotation.y +
                         rotation.z * rotation.z + rotation.w * rotation.w;
@@ -303,15 +280,13 @@ public sealed class WandSpellDemoController : MonoBehaviour
                 bool cast = !string.IsNullOrEmpty(packet.spell) && CastSpell(packet.spell, packet.conf, "IMU / UDP");
                 SendReply(message.endpoint, packet, cast ? "cast" : "ignored_not_ready_busy_or_invalid");
             }
-            catch (Exception exception)
-            {
+            catch (Exception exception) {
                 Debug.LogWarning("Invalid wand packet: " + exception.Message);
             }
         }
     }
 
-    void ApplyPose(SensorPacket packet)
-    {
+    void ApplyPose(SensorPacket packet) {
         if (!arenaReady || wand == null || string.IsNullOrEmpty(packet.session) ||
             packet.pose_id <= 0 || packet.q == null || packet.q.Length != 4) return;
         var rotation = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
@@ -322,8 +297,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         bool newStream = !hasPose || packet.session != poseSession;
         if (!newStream && packet.pose_id <= lastPoseId) return;
         latestPose = rotation;
-        if (newStream || packet.origin != poseOrigin)
-        {
+        if (newStream || packet.origin != poseOrigin) {
             poseAnchor = viewCamera != null ? viewCamera.transform.rotation : Quaternion.identity;
             poseReference = Quaternion.Inverse(rotation);
         }
@@ -336,16 +310,14 @@ public sealed class WandSpellDemoController : MonoBehaviour
         poseTarget = poseAnchor * poseReference * rotation * wandRest;
     }
 
-    void RecenterWand()
-    {
+    void RecenterWand() {
         if (!hasPose) return;
         poseAnchor = viewCamera != null ? viewCamera.transform.rotation : Quaternion.identity;
         poseReference = Quaternion.Inverse(latestPose);
         poseTarget = poseAnchor * wandRest;
     }
 
-    void LateUpdate()
-    {
+    void LateUpdate() {
         // Freeze the last orientation on link loss, rather than replaying motion.
         // World rotation keeps a head turn from also rotating the physical wand.
         if (hasPose && wand != null && arenaReady && Time.unscaledTime - lastPoseAt < .5f)
@@ -353,25 +325,26 @@ public sealed class WandSpellDemoController : MonoBehaviour
                 1f - Mathf.Exp(-35f * Time.unscaledDeltaTime));
     }
 
-    void SendReply(IPEndPoint endpoint, SensorPacket packet, string status)
-    {
+    void SendReply(IPEndPoint endpoint, SensorPacket packet, string status) {
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(new Reply {
-            session = packet.session, id = packet.id, status = status,
-            pose_count = poseCount, pose_angle = hasPose ? Quaternion.Angle(poseAnchor * wandRest, poseTarget) : 0f }));
+            session = packet.session,
+            id = packet.id,
+            status = status,
+            pose_count = poseCount,
+            pose_angle = hasPose ? Quaternion.Angle(poseAnchor * wandRest, poseTarget) : 0f
+        }));
         try { receiver.Send(bytes, bytes.Length, endpoint); }
         catch (SocketException exception) { Debug.LogWarning("Wand reply failed: " + exception.Message); }
         if (packet.id > 0) Debug.Log("WAND_BRIDGE " + packet.id + " " + status + " " + packet.spell);
     }
 
-    static Vector2 AdvanceAim(Vector2 current, Vector2 mouseDelta)
-    {
+    static Vector2 AdvanceAim(Vector2 current, Vector2 mouseDelta) {
         const float sensitivity = .0015f;
         return new Vector2(Mathf.Clamp(current.x + mouseDelta.x * sensitivity, .07f, .93f),
             Mathf.Clamp(current.y + mouseDelta.y * sensitivity, .12f, .88f));
     }
 
-    bool TryGetAimedCrystal(Ray ray, out Vector3 point)
-    {
+    bool TryGetAimedCrystal(Ray ray, out Vector3 point) {
         point = Vector3.zero;
         RaycastHit hit;
         Physics.SyncTransforms();
@@ -381,23 +354,20 @@ public sealed class WandSpellDemoController : MonoBehaviour
         return true;
     }
 
-    void SetWandStyle(int style)
-    {
+    void SetWandStyle(int style) {
         wandStyle = style;
         if (choiceText != null) choiceText.gameObject.SetActive(style < 0);
         if (wandStyles != null)
             for (int i = 0; i < wandStyles.Length; i++)
                 if (wandStyles[i] != null) wandStyles[i].gameObject.SetActive(i == style);
-        if (style >= 0)
-        {
+        if (style >= 0) {
             UpdateLabels("THE GATE AWAKENS", "ENTERING THE ARENA");
             if (sceneRig != null) StartCoroutine(EnterArena());
             else arenaReady = true;
         }
     }
 
-    IEnumerator EnterArena()
-    {
+    IEnumerator EnterArena() {
         arenaReady = false;
         var from = sceneRig.position;
         var to = new Vector3(0f, 0f, -3.25f);
@@ -406,8 +376,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         var leftHome = doorLeft != null ? doorLeft.localPosition : Vector3.zero;
         var rightHome = doorRight != null ? doorRight.localPosition : Vector3.zero;
         float elapsed = 0f;
-        while (elapsed < 2.7f)
-        {
+        while (elapsed < 2.7f) {
             elapsed += Time.deltaTime;
             float gate = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / .85f));
             if (doorLeft != null) doorLeft.localPosition = leftHome + Vector3.left * gate * 1.7f;
@@ -429,17 +398,11 @@ public sealed class WandSpellDemoController : MonoBehaviour
 
     string InputHint() => XRSettings.isDeviceActive ? "MOVE THE REAL WAND  /  A OR X TO CENTER" : "MOVE MOUSE TO AIM  /  LEFT CLICK TO FIRE";
 
-    public bool CastSpell(string spell, float confidence, string source)
-    {
+    public bool CastSpell(string spell, float confidence, string source) {
         if (string.IsNullOrWhiteSpace(spell) || float.IsNaN(confidence) || confidence < .55f || confidence > 1f ||
             wandStyle < 0 || !arenaReady || busy || Time.time - lastSpellTime < 0.25f ||
             targets == null || selected >= targets.Length) return false;
         spell = spell.Trim().ToLowerInvariant();
-        if (spell == "fireball") spell = "fire";
-        if (spell == "ice") spell = "frost";
-        if (spell == "lightning") spell = "storm";
-        if (spell == "water") spell = "frost";
-        if (spell == "wind") spell = "arcane";
         int spellIndex = Array.IndexOf(SpellNames, spell);
         if (spellIndex < 0) return false;
         lastSpellTime = Time.time;
@@ -447,8 +410,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         return true;
     }
 
-    IEnumerator CastAndShatter(int spellIndex, float confidence, string source)
-    {
+    IEnumerator CastAndShatter(int spellIndex, float confidence, string source) {
         busy = true;
         int index = selected;
         var color = SpellColors[spellIndex];
@@ -456,15 +418,27 @@ public sealed class WandSpellDemoController : MonoBehaviour
         UpdateLabels(SpellNames[spellIndex].ToUpperInvariant() + "  /  CRYSTAL " + (index + 1),
             source + "  " + Mathf.Clamp01(confidence).ToString("P0"));
         yield return StartCoroutine(SpellEffect(SpellNames[spellIndex], color, destination));
+        // Only the currently selected crystal can shatter, and only with its configured spell.
+        var crystalTarget = targets[index].GetComponent<CrystalTarget>();
+        if (crystalTarget == null) {
+            Debug.LogWarning("Crystal " + (index + 1) + " is missing CrystalTarget.");
+            UpdateLabels("CRYSTAL SETUP MISSING", "ADD CRYSTALTARGET TO ACTIVE CRYSTAL");
+            busy = false;
+            yield break;
+        }
+        if (!crystalTarget.CanShatter(SpellNames[spellIndex])) {
+            UpdateLabels("WRONG SPELL FOR CRYSTAL " + (index + 1),
+                "REQUIRES " + crystalTarget.requiredSpell.ToString().ToUpperInvariant());
+            busy = false;
+            yield break;
+        }
         yield return StartCoroutine(Shatter(index, color));
         score++; selected++;
         if (scoreText != null) scoreText.text = score + " / " + targets.Length + " CRYSTALS";
-        if (selected >= targets.Length)
-        {
+        if (selected >= targets.Length) {
             UpdateLabels("SANCTUM CLEARED", "THE CRYSTALS WILL REFORM");
             yield return new WaitForSeconds(2.5f);
-            for (int i = 0; i < targets.Length; i++)
-            {
+            for (int i = 0; i < targets.Length; i++) {
                 broken[i] = false;
                 targets[i].gameObject.SetActive(true);
                 targets[i].localPosition = crystalHome[i];
@@ -476,61 +450,133 @@ public sealed class WandSpellDemoController : MonoBehaviour
         busy = false;
     }
 
-    IEnumerator SpellEffect(string spell, Color color, Vector3 destination)
-    {
+    IEnumerator SpellEffect(string spell, Color color, Vector3 destination) {
         var start = wandTip.position;
-        if (spell == "storm" || spell == "shatter")
-        {
-            var bolt = new GameObject("Storm spell - temporary arc");
+        if (spell == "lightning") {
+            // Original Storm effect: nine points, one fixed random zigzag.
+            var bolt = new GameObject("Lightning spell - temporary storm arc");
             var line = bolt.AddComponent<LineRenderer>();
             line.positionCount = 9;
-            line.startWidth = 0.035f;
-            line.endWidth = 0.008f;
-            line.material = Glow(color);
-            for (var i = 0; i < 9; ++i)
-            {
-                var t = i / 8f;
-                line.SetPosition(i, Vector3.Lerp(start, destination, t) +
-                    (i == 0 || i == 8 ? Vector3.zero : UnityEngine.Random.insideUnitSphere * 0.08f));
+            line.startWidth = 0.055f;
+            line.endWidth = 0.015f;
+            var material = Glow(color);
+            line.material = material;
+            // Screen-vertical axis, perpendicular to the bolt's travel direction.
+            Vector3 travel = (destination - start).normalized;
+            Vector3 cameraUp = viewCamera != null ? viewCamera.transform.up : Vector3.up;
+            Vector3 vertical = Vector3.ProjectOnPlane(cameraUp, travel).normalized;
+            if (vertical.sqrMagnitude < 0.001f)
+                vertical = Vector3.ProjectOnPlane(Vector3.right, travel).normalized;
+            for (var i = 0; i < 9; ++i) {
+                float t = i / 8f;
+                // Alternate sides to create obvious, wide zigzags.
+                float displacement = (i == 0 || i == 8) ? 0f :
+                    (i % 2 == 0 ? 1f : -1f) * UnityEngine.Random.Range(.17f, .25f);
+                line.SetPosition(i, Vector3.Lerp(start, destination, t) + vertical * displacement);
             }
             Destroy(bolt, 0.28f);
+            Destroy(material, 0.28f);
             yield return new WaitForSeconds(.24f);
             yield break;
         }
 
-        var projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        projectile.name = spell + " spell projectile";
-        Destroy(projectile.GetComponent<Collider>());
-        projectile.transform.localScale = Vector3.one * (spell == "fire" ? 0.13f : 0.10f);
-        projectile.GetComponent<Renderer>().material = Glow(color);
-        var light = projectile.AddComponent<Light>();
-        light.color = color;
-        light.range = 1.5f;
-        light.intensity = 2f;
-        var trail = projectile.AddComponent<TrailRenderer>();
-        trail.time = 0.25f;
-        trail.startWidth = 0.09f;
-        trail.endWidth = 0f;
-        trail.material = Glow(color);
-        var elapsed = 0f;
-        while (elapsed < 0.4f)
-        {
+        // Build an orthonormal frame around the direction of travel.
+        // Water uses a screen-vertical axis; wind uses both axes (3D helix).
+        var direction = (destination - start).normalized;
+        if (direction.sqrMagnitude < .0001f) yield break;
+        var reference = Mathf.Abs(Vector3.Dot(direction, Vector3.up)) > .95f
+            ? Vector3.right : Vector3.up;
+        var right = Vector3.Cross(direction, reference).normalized;
+        var up = Vector3.Cross(right, direction).normalized;
+        // Align water up-and-down in the player's view.
+        var cameraUpAxis = viewCamera != null ? viewCamera.transform.up : Vector3.up;
+        var waterVertical = Vector3.ProjectOnPlane(cameraUpAxis, direction).normalized;
+        if (waterVertical.sqrMagnitude < .001f) waterVertical = up;
+
+        const int points = 32;
+        var root = new GameObject(spell + " spell - temporary lines");
+        int lineCount = spell == "water" ? 1 : spell == "wind" ? 2 : 3;
+        var lines = new LineRenderer[lineCount];
+        var materials = new Material[lineCount];
+        for (int j = 0; j < lineCount; ++j) {
+            var child = new GameObject("Ribbon " + (j + 1));
+            child.transform.SetParent(root.transform, false);
+            var line = child.AddComponent<LineRenderer>();
+            line.useWorldSpace = true;
+            line.positionCount = points;
+            line.numCornerVertices = 3;
+            line.numCapVertices = 3;
+            line.textureMode = LineTextureMode.Stretch;
+            Color ribbonColor = color;
+            if (spell == "fire")
+                ribbonColor = j == 0 ? new Color(1f, .20f, .02f) :
+                    j == 1 ? new Color(1f, .10f, .01f) : new Color(.90f, .02f, .01f);
+            else if (spell == "wind" && j == 1)
+                ribbonColor = new Color(.02f, .85f, .08f);
+            materials[j] = Glow(ribbonColor);
+            line.material = materials[j];
+            line.startWidth = spell == "fire" ? (j == 0 ? .075f : .038f) :
+                spell == "water" ? .045f : .024f;
+            line.endWidth = spell == "water" ? .022f : .005f;
+            if (spell == "fire") {
+                // Thick base, tapering to sharp flame tips.
+                line.widthCurve = new AnimationCurve(
+                    new Keyframe(0f, .15f), new Keyframe(.18f, 1f),
+                    new Keyframe(.55f, .85f), new Keyframe(.82f, .50f),
+                    new Keyframe(1f, 0f));
+                line.widthMultiplier = j == 0 ? .105f : .065f;
+            }
+            lines[j] = line;
+        }
+
+        // Short-lived animated beams; no prefab or separate VFX asset needed.
+        float elapsed = 0f;
+        const float duration = .38f;
+        while (elapsed < duration) {
             elapsed += Time.deltaTime;
-            projectile.transform.position = Vector3.Lerp(start, destination, Mathf.Clamp01(elapsed / 0.4f));
+            float time = elapsed * 12f;
+            for (int j = 0; j < lineCount; ++j) {
+                for (int i = 0; i < points; ++i) {
+                    float t = i / (float)(points - 1);
+                    var center = Vector3.Lerp(start, destination, t);
+                    // Both ends stay attached to the wand and crystal.
+                    float envelope = Mathf.Sin(t * Mathf.PI);
+                    Vector3 offset;
+                    if (spell == "water") {
+                        // Two smooth cycles in one plane; gently travels forward.
+                        offset = waterVertical * (Mathf.Sin(t * Mathf.PI * 4f - time * 1.3f)
+                            * .22f * envelope);
+                    } else if (spell == "wind") {
+                        // Two intertwined helices around an imaginary tube.
+                        float angle = t * Mathf.PI * 6f - time * 1.7f + j * Mathf.PI;
+                        float radius = .085f * envelope;
+                        offset = (right * Mathf.Cos(angle) + up * Mathf.Sin(angle)) * radius;
+                    } else // fire
+                      {
+                        // Three tapered, uneven flame ribbons with upward tongues.
+                        float phase = j * 1.7f;
+                        float wave = Mathf.Sin(t * Mathf.PI * (3.5f + j * .5f) - time * 2f + phase);
+                        float flicker = Mathf.Sin(t * 35f - time * 3.2f + phase) * .025f;
+                        float spread = j == 0 ? 0f : j == 1 ? .085f : -.07f;
+                        offset = up * (envelope * (wave * .065f + flicker + spread)) +
+                            right * (envelope * Mathf.Sin(t * 12f + time + phase) * .025f);
+                    }
+                    lines[j].SetPosition(i, center + offset);
+                }
+            }
             yield return null;
         }
-        Destroy(projectile, 0.3f);
+        Destroy(root);
+        foreach (var material in materials) Destroy(material);
     }
 
-    IEnumerator Shatter(int index, Color color)
-    {
+    IEnumerator Shatter(int index, Color color) {
         var crystal = targets[index];
         var impactPoint = crystal.position;
         var mesh = targetCrystals[index].GetComponent<MeshFilter>().sharedMesh;
         var pieces = new List<Transform>();
         var directions = new List<Vector3>();
-        for (int i = 0; i < 20; i++)
-        {
+        for (int i = 0; i < 20; i++) {
             var piece = new GameObject("Flying crystal shard");
             piece.transform.position = crystal.position + UnityEngine.Random.insideUnitSphere * .13f;
             piece.transform.rotation = UnityEngine.Random.rotation;
@@ -566,22 +612,19 @@ public sealed class WandSpellDemoController : MonoBehaviour
         broken[index] = true;
         crystal.gameObject.SetActive(false);
         float elapsed = 0f;
-        while (elapsed < .8f)
-        {
+        while (elapsed < .8f) {
             var dt = Time.deltaTime; elapsed += dt;
             float radius = .18f + elapsed * 1.35f;
             var right = viewCamera != null ? viewCamera.transform.right : Vector3.right;
             var up = viewCamera != null ? viewCamera.transform.up : Vector3.up;
-            for (int j = 0; j < 48; j++)
-            {
+            for (int j = 0; j < 48; j++) {
                 float angle = j * Mathf.PI * 2f / 48f;
                 halo.SetPosition(j, impactPoint +
                     (right * Mathf.Cos(angle) + up * Mathf.Sin(angle)) * radius);
             }
             halo.startWidth = halo.endWidth = Mathf.Max(0f, .05f * (1f - elapsed / .8f));
             impactLight.intensity = 5f * (1f - elapsed / .8f);
-            for (int i = 0; i < pieces.Count; i++)
-            {
+            for (int i = 0; i < pieces.Count; i++) {
                 pieces[i].position += (directions[i] * 2f + Vector3.down * elapsed * 1.5f) * dt;
                 pieces[i].Rotate(90f * dt, 120f * dt, 70f * dt);
                 pieces[i].localScale *= 1f - dt * 1.1f;
@@ -593,8 +636,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         Destroy(burst, 1f);
     }
 
-    static Material Glow(Color color)
-    {
+    static Material Glow(Color color) {
         var material = new Material(Shader.Find("Standard"));
         material.color = color;
         material.EnableKeyword("_EMISSION");
@@ -602,8 +644,7 @@ public sealed class WandSpellDemoController : MonoBehaviour
         return material;
     }
 
-    void UpdateLabels(string headline, string subline)
-    {
+    void UpdateLabels(string headline, string subline) {
         if (statusText != null) statusText.text = headline + "\n" + subline;
     }
 }
