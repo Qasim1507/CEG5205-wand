@@ -21,8 +21,9 @@ Manual packets such as `{"spell":"fire","conf":0.93}` remain supported for diagn
 The Android Quest build is `Builds/WandSpellsMeetingDemo.apk`. Install on a USB-authorized
 Quest with `./install-quest-mac.sh wand`. In Quest, look at a displayed wand for
 1.2 seconds to select it, then cast by moving the real IMU wand. The view teleports
-into the arena after the gate opens. Sensor casts target the active crystal;
-match its element. In the dummy stage, **head tracking controls aiming**: look
+into the arena after the gate opens. In stage one, aim at the active crystal and
+match its element to score. Every spell goes toward the crosshair, including
+misses, which give no points. In both stages, **head tracking controls aiming**: look
 through the centered crosshair at the dummy and cast the element matching its
 crystal. The left joystick is not used. Head aiming updates the target marker
 continuously while the physical IMU still animates the wand. The scene uses a virtual chamber

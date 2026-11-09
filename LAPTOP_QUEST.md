@@ -30,14 +30,16 @@ Wait for **Quest link: CONNECTED** in the laptop output.
 
 In Quest, look directly at one of the three displayed wands for 1.2 seconds to
 select it. The gate opens and you enter the arena. Then perform a gesture and
-pause briefly to finish it. Match the active crystal's element to break it.
+pause briefly to finish it. Aim at the active crystal and match its element to break it.
 After the five crystals, the game enters the moving-dummy stage. On Quest, look
 at the dummy to aim the centered crosshair, then cast the element matching its
 crystal (red fire, blue water, green wind, yellow lightning). Head tracking steers
 the shot independently of wand gestures; the target marker shows when the ray
 is on the dummy. On desktop, aiming uses the mouse crosshair.
-The crystal stage retains automatic targeting for sensor casts; the dummy stage
-requires aiming. The system does
+Both stages require aiming. In stage one, the spell effect goes to the crosshair's
+aimed point even on a miss; only hitting the active crystal with its matching
+element breaks it and scores a point. Aim is captured when you cast, so looking
+at the crystal after firing cannot turn a miss into a hit. The system does
 not track the physical wand's position in the room. Its grip stays at a fixed
 offset from the view, but its rotation now follows the IMU continuously, independent
 of the classifier. Desktop mouse aiming and clicks still work in the editor.

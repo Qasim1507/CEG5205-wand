@@ -81,7 +81,9 @@ or `py -3.14 setup_wand.py` on Windows.
 
 The wand follows tilt and swing continuously, including between casts. Its grip
 stays at a fixed offset from the view; the IMU does not measure room position.
-In the crystal stage, cast the element matching the active crystal's colour.
+In the crystal stage, aim the crosshair at the active crystal and cast its matching
+element. Spells fire toward your aimed point even when you miss; a point is awarded
+only for a correctly aimed, matching spell. Hitting another crystal does not score.
 Clearing all five opens the moving-dummy stage. On Quest, **look at the dummy to
 aim the centered crosshair**, then cast the element matching its crystal: red
 fire, blue water, green wind or yellow lightning. The wand still rotates with
@@ -163,8 +165,8 @@ not included.
 
 Leave the physical wand still until calibration finishes and the live window
 appears. After Unity enters the arena, swing/tilt the wand and perform gestures
-to cast the element matching the active crystal. In the dummy stage, use the
-mouse crosshair to aim while the physical wand selects the spell. Point forward and press **R** in the Python window
+to cast the element matching the active crystal. Use the mouse crosshair to aim
+in both stages while the physical wand selects the spell. Point forward and press **R** in the Python window
 to recenter. Focus that window and press **Q/Esc** to stop recognition; stop Play
 mode in Unity when finished.
 

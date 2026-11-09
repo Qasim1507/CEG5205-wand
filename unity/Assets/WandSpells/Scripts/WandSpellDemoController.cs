@@ -279,14 +279,14 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                 }
                 if (level2Active) {                                                                          // LEVEL2
                     CastSpellAtDummy(SpellNames[level2Casts++ % SpellNames.Length], 1f, "MOUSE AIM", ray, false);
-                } else if (hitTarget) {
+                } else if (selected < targets.Length) {
                     // Mouse testing casts the spell configured on the active crystal.                       // REMOTE
                     var crystalTarget = targets[selected].GetComponent<CrystalTarget>();
                     if (crystalTarget != null)
                         CastSpell(crystalTarget.requiredSpell.ToString().ToLowerInvariant(), 1f, "MOUSE AIM");
                     else
                         UpdateLabels("CRYSTAL SETUP MISSING", "ADD CRYSTALTARGET COMPONENT");
-                } else UpdateLabels("CRYSTAL " + (selected + 1) + " IS ACTIVE", "AIM AT THE GLOWING CRYSTAL");
+                }
             }
         }
  
@@ -510,8 +510,8 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         point = Vector3.zero;
         RaycastHit hit;
         Physics.SyncTransforms();
-        if (!Physics.Raycast(ray, out hit, 30f) || selected >= targets.Length ||
-            hit.collider.transform != targets[selected]) return false;
+        if (targets == null || selected >= targets.Length || !Physics.Raycast(ray, out hit, 30f) ||
+            !hit.collider.transform.IsChildOf(targets[selected])) return false;
         point = hit.point;
         return true;
     }
@@ -560,7 +560,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     }
 
     string InputHint() => XRSettings.isDeviceActive
-        ? (level2Active ? "LOOK TO AIM / MATCH COLOUR / GESTURE TO CAST" : "MATCH CRYSTAL COLOUR / GESTURE TO CAST")
+        ? "LOOK TO AIM / MATCH COLOUR / GESTURE TO CAST"
         : "MOVE MOUSE TO AIM  /  LEFT CLICK TO FIRE";
 
     public bool CastSpell(string spell, float confidence, string source) {
@@ -570,19 +570,33 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         spell = spell.Trim().ToLowerInvariant();
         int spellIndex = Array.IndexOf(SpellNames, spell);
         if (spellIndex < 0) return false;
+        // Snapshot the crosshair at cast time; neither a miss nor a wrong target
+        // can be corrected by looking at the active crystal after firing.
+        var ray = GetCrosshairRay();
+        Vector3 destination;
+        bool aimedAtCrystal = TryGetAimedCrystal(ray, out destination);
+        if (!aimedAtCrystal) {
+            RaycastHit impact;
+            destination = Physics.Raycast(ray, out impact, 30f) ? impact.point : ray.GetPoint(30f);
+        }
         lastSpellTime = Time.time;
-        StartCoroutine(CastAndShatter(spellIndex, confidence, source));
+        Debug.Log("WAND_CRYSTAL_AIM hit=" + aimedAtCrystal + " crystal=" + (selected + 1) + " spell=" + spell);
+        StartCoroutine(CastAndShatter(spellIndex, confidence, source, destination, aimedAtCrystal));
         return true;
     }
 
-    IEnumerator CastAndShatter(int spellIndex, float confidence, string source) {
+    IEnumerator CastAndShatter(int spellIndex, float confidence, string source, Vector3 destination, bool aimedAtCrystal) {
         busy = true;
         int index = selected;
         var color = SpellColors[spellIndex];
-        var destination = targets[index].position;
-        UpdateLabels(SpellNames[spellIndex].ToUpperInvariant() + "  /  CRYSTAL " + (index + 1),
+        UpdateLabels(SpellNames[spellIndex].ToUpperInvariant() + (aimedAtCrystal ? "  /  CRYSTAL " + (index + 1) : "  /  MISSED"),
             source + "  " + Mathf.Clamp01(confidence).ToString("P0"));
         yield return StartCoroutine(SpellEffect(SpellNames[spellIndex], color, destination));
+        if (!aimedAtCrystal) {
+            UpdateLabels("MISSED / NO POINT", "AIM AT THE GLOWING CRYSTAL");
+            busy = false;
+            yield break;
+        }
         // Only the currently selected crystal can shatter, and only with its configured spell.
         var crystalTarget = targets[index].GetComponent<CrystalTarget>();
         if (crystalTarget == null) {

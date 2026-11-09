@@ -129,16 +129,43 @@ public class WandSequenceValidation
         }
         Set("targets", targets); Set("targetCrystals", renderers);
         yield return null;
+        var aimCamera = new GameObject("spell aim camera").AddComponent<Camera>();
+        aimCamera.transform.SetParent(root.transform);
+        aimCamera.transform.position = new Vector3(0f, 1f, -2f);
+        type.GetField("viewCamera", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, aimCamera);
         type.GetMethod("SetWandStyle", BindingFlags.NonPublic | BindingFlags.Instance)
             .Invoke(controller, new object[] { 0 });
         var rig = new GameObject("level transition rig").transform;
         rig.SetParent(root.transform);
         Set("sceneRig", rig);
+        aimCamera.transform.rotation = Quaternion.Euler(-70f, 0f, 0f);
+        var missRay = aimCamera.ViewportPointToRay(new Vector3(.5f, .5f, 0f));
+        Assert.IsTrue((bool)type.GetMethod("CastSpell").Invoke(controller, new object[] { "fire", 1f, "TEST MISS" }),
+            "A miss should still produce a spell effect");
+        // Moving the crosshair after firing must not turn this miss into a hit.
+        aimCamera.transform.LookAt(targets[0]);
+        yield return null;
+        var effect = GameObject.Find("fire spell - temporary lines");
+        Assert.IsNotNull(effect);
+        var ribbon = effect.GetComponentInChildren<LineRenderer>();
+        Assert.Less(Vector3.Distance(missRay.GetPoint(30f), ribbon.GetPosition(ribbon.positionCount - 1)), .02f,
+            "The effect must end at the aimed point, not snap to a crystal");
+        yield return new WaitForSeconds(.65f);
+        Assert.IsTrue(targets[0].gameObject.activeSelf);
+        Assert.AreEqual(0, type.GetField("score", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller));
+        aimCamera.transform.LookAt(targets[1]);
+        type.GetMethod("CastSpell").Invoke(controller, new object[] { "fire", 1f, "TEST WRONG TARGET" });
+        yield return new WaitForSeconds(.7f);
+        Assert.IsTrue(targets[0].gameObject.activeSelf);
+        Assert.IsTrue(targets[1].gameObject.activeSelf);
+        Assert.AreEqual(0, type.GetField("score", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller));
+        aimCamera.transform.LookAt(targets[0]);
         type.GetMethod("CastSpell").Invoke(controller, new object[] { "water", 1f, "TEST WRONG ELEMENT" });
         yield return new WaitForSeconds(1.45f);
         Assert.IsTrue(targets[0].gameObject.activeSelf, "Wrong spell must not break a crystal");
         for (int i = 0; i < 5; i++)
         {
+            aimCamera.transform.LookAt(targets[i]);
             type.GetMethod("CastSpell").Invoke(controller, new object[] { spells[i], 1f, "TEST" });
             yield return new WaitForSeconds(1.45f);
             Assert.IsFalse(targets[i].gameObject.activeSelf, "Crystal " + i + " did not shatter");
