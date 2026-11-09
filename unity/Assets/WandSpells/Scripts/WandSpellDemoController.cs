@@ -98,7 +98,32 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     Vector2 aimViewport = new Vector2(.5f, .5f);
     bool skipMouseDelta;
 
-    void Start() {
+    [SerializeField] private Renderer runicAlcoveShadow;   // the Renderer on "Runic alcove shadow"
+    [SerializeField] private Material whiteMaterial;       // your existing White material asset
+
+    [Header("Level 2 dummy")]
+    [SerializeField] private DummyHitReaction dummyReaction;   // LEVEL2: the DummyHitReaction on the dummy
+    [SerializeField] private float dummyAimRadius = 0.3f;      // LEVEL2: forgiveness when aiming at the dummy
+    private bool level2Active;                                 // LEVEL2: set true at the end of EnterLevel2()
+    private int level2Hits;                                    // LEVEL2
+
+    [Header("IMU aiming")]
+    [Tooltip("Cone (degrees) around the dummy centre that counts as a hit for IMU casts. Lower it as calibration improves.")]
+    [SerializeField] private float imuAimToleranceDeg = 8f;
+    private int level2Casts; 
+
+    [Tooltip("Level 2: also allow left click to cast. Turn off once IMU gestures are the only way to cast.")]
+    [SerializeField] private bool allowMouseClickCast = true;
+    
+    // Crosshair ray: same aim the mouse uses (falls back to the camera centre in VR).
+    Ray GetCrosshairRay()
+    {
+    var vp = new Vector3(aimViewport.x, aimViewport.y, 0f);
+    return viewCamera != null ? viewCamera.ViewportPointToRay(vp) : new Ray(wand.position, wand.forward);
+    }
+
+    void Start()
+    {
         crystalHome = new Vector3[targets.Length];
         broken = new bool[targets.Length];
         for (var i = 0; i < targets.Length; ++i) crystalHome[i] = targets[i].localPosition;
@@ -109,23 +134,27 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         if (aimMarker != null) aimMarker.gameObject.SetActive(false);
         if (crosshair != null) crosshair.gameObject.SetActive(false);
         UpdateLabels("CHOOSE A WAND", "");
-        if (scoreText != null) {
+        if (scoreText != null)
+        {
             scoreText.text = "0 / " + targets.Length + " CRYSTALS";
             scoreText.gameObject.SetActive(false);
         }
-        try {
+        try
+        {
             receiver = new UdpClient(udpPort);
             receiver.Client.ReceiveTimeout = 250;
             listening = true;
             reader = new Thread(ReadPackets) { IsBackground = true, Name = "Wand spell UDP" };
             reader.Start();
         }
-        catch (Exception exception) {
+        catch (Exception exception)
+        {
             Debug.LogWarning("Wand UDP input unavailable: " + exception.Message);
         }
     }
 
-    void OnDestroy() {
+    void OnDestroy()
+    {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         listening = false;
@@ -133,17 +162,20 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         if (reader != null && reader.IsAlive) reader.Join(300);
     }
 
-    void ReadPackets() {
+    void ReadPackets()
+    {
         var endpoint = new IPEndPoint(IPAddress.Any, 0);
-        while (listening) {
-            try {
+        while (listening)
+        {
+            try
+            {
                 var bytes = receiver.Receive(ref endpoint);
                 var json = Encoding.UTF8.GetString(bytes);
-                lock (incoming) {
+                lock (incoming)
+                {
                     if (incoming.Count < 32) incoming.Enqueue(new IncomingPacket {
                         json = json,
-                        endpoint = new IPEndPoint(endpoint.Address, endpoint.Port)
-                    });
+                        endpoint = new IPEndPoint(endpoint.Address, endpoint.Port) });
                 }
             }
             catch (SocketException) { }
@@ -220,14 +252,15 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             wand.localPosition = Vector3.Lerp(wand.localPosition, desiredPosition, Time.deltaTime * 12f);
             var aimPoint = ray.GetPoint(6f);
             Vector3 hitPoint;
-            bool hitCrystal = TryGetAimedCrystal(ray, out hitPoint);
-            if (hitCrystal) aimPoint = hitPoint;
+            // LEVEL2: in level 2 the aim target is the dummy, not the crystals (never touches targets[selected])
+            bool hitTarget = level2Active ? TryGetAimedDummy(ray, out hitPoint) : TryGetAimedCrystal(ray, out hitPoint);
+            if (hitTarget) aimPoint = hitPoint;
             var localDirection = wand.parent.InverseTransformDirection((aimPoint - wand.position).normalized);
             var desiredRotation = Quaternion.LookRotation(localDirection, Vector3.up);
             wand.localRotation = Quaternion.Slerp(wand.localRotation, desiredRotation, Time.deltaTime * 16f);
             if (aimMarker != null) {
-                aimMarker.gameObject.SetActive(hitCrystal);
-                if (hitCrystal) aimMarker.position = targets[selected].position;
+                aimMarker.gameObject.SetActive(hitTarget);
+                if (hitTarget) aimMarker.position = level2Active ? hitPoint : targets[selected].position;   // LEVEL2
             }
             if (mouse.leftButton.wasPressedThisFrame && !busy) {
                 if (Cursor.lockState != CursorLockMode.Locked) {
@@ -235,8 +268,10 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                     Cursor.visible = false;
                     skipMouseDelta = true;
                 }
-                if (hitCrystal) {
-                    // Mouse testing casts the spell configured on the active crystal.
+                if (level2Active) {                                                                          // LEVEL2
+                    CastSpellAtDummy(SpellNames[level2Casts++ % SpellNames.Length], 1f, "MOUSE AIM", ray, false);
+                } else if (hitTarget) {
+                    // Mouse testing casts the spell configured on the active crystal.                       // REMOTE
                     var crystalTarget = targets[selected].GetComponent<CrystalTarget>();
                     if (crystalTarget != null)
                         CastSpell(crystalTarget.requiredSpell.ToString().ToLowerInvariant(), 1f, "MOUSE AIM");
@@ -245,7 +280,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                 } else UpdateLabels("CRYSTAL " + (selected + 1) + " IS ACTIVE", "AIM AT THE GLOWING CRYSTAL");
             }
         }
-
+ 
         while (true) {
             IncomingPacket message;
             lock (incoming) {
@@ -275,9 +310,13 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                     var rotation = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
                     var lengthSquared = rotation.x * rotation.x + rotation.y * rotation.y +
                         rotation.z * rotation.z + rotation.w * rotation.w;
-                    if (lengthSquared > 0.1f) wand.localRotation = recenter * rotation.normalized;
+                    if (!level2Active && !hasPose && lengthSquared > 0.1f) wand.localRotation = recenter * rotation.normalized;   // LEVEL2
                 }
-                bool cast = !string.IsNullOrEmpty(packet.spell) && CastSpell(packet.spell, packet.conf, "IMU / UDP");
+                // LEVEL2: in level 2 the IMU only classifies the gesture; aim comes from the mouse crosshair.
+                bool cast = !string.IsNullOrEmpty(packet.spell) &&
+                    (level2Active
+                        ? CastSpellAtDummy(packet.spell, packet.conf, "IMU / UDP", GetCrosshairRay(), false)
+                        : CastSpell(packet.spell, packet.conf, "IMU / UDP"));
                 SendReply(message.endpoint, packet, cast ? "cast" : "ignored_not_ready_busy_or_invalid");
             }
             catch (Exception exception) {
@@ -286,8 +325,9 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         }
     }
 
-    void ApplyPose(SensorPacket packet) {
-        if (!arenaReady || wand == null || string.IsNullOrEmpty(packet.session) ||
+    void ApplyPose(SensorPacket packet)
+    {
+        if (level2Active || !arenaReady || wand == null || string.IsNullOrEmpty(packet.session) ||
             packet.pose_id <= 0 || packet.q == null || packet.q.Length != 4) return;
         var rotation = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
         foreach (var value in packet.q)
@@ -317,10 +357,11 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         poseTarget = poseAnchor * wandRest;
     }
 
-    void LateUpdate() {
+    void LateUpdate()
+    {
         // Freeze the last orientation on link loss, rather than replaying motion.
         // World rotation keeps a head turn from also rotating the physical wand.
-        if (hasPose && wand != null && arenaReady && Time.unscaledTime - lastPoseAt < .5f)
+        if (!level2Active && hasPose && wand != null && arenaReady && Time.unscaledTime - lastPoseAt < .5f)
             wand.rotation = Quaternion.Slerp(wand.rotation, poseTarget,
                 1f - Mathf.Exp(-35f * Time.unscaledDeltaTime));
     }
@@ -436,15 +477,13 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         score++; selected++;
         if (scoreText != null) scoreText.text = score + " / " + targets.Length + " CRYSTALS";
         if (selected >= targets.Length) {
-            UpdateLabels("SANCTUM CLEARED", "THE CRYSTALS WILL REFORM");
-            yield return new WaitForSeconds(2.5f);
-            for (int i = 0; i < targets.Length; i++) {
-                broken[i] = false;
-                targets[i].gameObject.SetActive(true);
-                targets[i].localPosition = crystalHome[i];
-            }
-            selected = score = 0;
-            if (scoreText != null) scoreText.text = "0 / " + targets.Length + " CRYSTALS";
+            UpdateLabels("SANCTUM CLEARED", "THE GATE TO LEVEL 2 OPENS");
+            // if (sanctuaryKeystone != null) sanctuaryKeystone.SetActive(false);
+            yield return new WaitForSeconds(2.0f);                       // let the message be read; shorten if you like
+            if (sceneRig != null) yield return StartCoroutine(EnterLevel2());   // wait until the move finishes
+            UpdateLabels("LEVEL 2", InputHint());
+            busy = false;
+            yield break;                                                 // skip the "CRYSTAL n IS ACTIVE" label below
         }
         UpdateLabels("CRYSTAL " + (selected + 1) + " IS ACTIVE", InputHint());
         busy = false;
@@ -646,5 +685,161 @@ public sealed class WandSpellDemoController : MonoBehaviour {
 
     void UpdateLabels(string headline, string subline) {
         if (statusText != null) statusText.text = headline + "\n" + subline;
+    }
+
+    // Implementation for Dummy Training Scene - Level 2
+    IEnumerator EnterLevel2()
+    {
+    arenaReady = false;                                     // pause aiming/casting during the move
+    level2Active = false;
+    var from = sceneRig.position;
+    var to = from + new Vector3(0f, 0f, 15.0f);             // relative, so it works wherever the rig ended up
+
+    foreach (var go in GameObject.FindGameObjectsWithTag("Level1Dynamic"))
+        go.SetActive(false);
+    if (runicAlcoveShadow != null && whiteMaterial != null)
+        runicAlcoveShadow.sharedMaterial = whiteMaterial;   // Obsidian -> White
+
+    float elapsed = 0f;
+    while (elapsed < 3.0f)
+    {
+        elapsed += Time.deltaTime;
+        float travel = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / 3.0f));
+        if (!XRSettings.isDeviceActive) sceneRig.position = Vector3.Lerp(from, to, travel);
+        yield return null;
+    }
+    sceneRig.position = to;                                // VR: snaps here, same as EnterArena
+    
+    // ---- same "start playing" setup that EnterArena does ----
+    level2Active = true;                                   // switches Update() from crystals to the dummy
+    level2Hits = 0;
+    arenaReady = true;
+    aimViewport = new Vector2(.5f, .5f);                   // recentre the crosshair after the move
+    Cursor.lockState = CursorLockMode.Locked;              // re-lock in case Esc/alt-tab freed it
+    Cursor.visible = false;
+    skipMouseDelta = true;                                 // ignore the first mouse delta after re-locking
+    if (crosshair != null) crosshair.gameObject.SetActive(true);
+    if (scoreText != null)
+    {
+        scoreText.gameObject.SetActive(true);
+        scoreText.text = "0 HITS";                           // the old "N / N CRYSTALS" text no longer applies
+    }
+    if (aimMarker != null) aimMarker.gameObject.SetActive(false);
+    
+    // start the dummy(s) sliding
+    foreach (var dummy in GameObject.FindGameObjectsWithTag("Level2Dummy"))
+    {
+        var slider = dummy.GetComponent<SlidingDummy>();
+        if (slider != null) slider.enabled = true;
+    }
+    
+    UpdateLabels("LEVEL 2", InputHint());
+    // level2Move = null;
+ }
+
+    bool TryGetAimedDummy(Ray ray, out Vector3 point)
+    {
+    point = Vector3.zero;
+    if (dummyReaction == null) return false;
+    RaycastHit hit;
+    
+    if (Physics.SphereCast(ray, dummyAimRadius, out hit, 40f) &&
+        hit.collider.transform.IsChildOf(dummyReaction.transform))
+    {
+        // Debug.Log($"[aim] ray hit {hit.collider.name}, child of dummy = {hit.collider.transform.IsChildOf(dummyReaction.transform)}");
+        point = hit.point;
+        return true;
+    }
+    return false;
+    }
+    Ray GetImuAimRay()
+    {
+    var origin = viewCamera != null ? viewCamera.transform.position : wand.position;
+    bool poseLive = hasPose && Time.unscaledTime - lastPoseAt < .5f;
+    var direction = poseLive ? poseTarget * Vector3.forward : wand.forward;
+    return new Ray(origin, direction);
+    }
+    
+    Vector3 DummyCenter()
+    {
+    var col = dummyReaction.GetComponentInChildren<Collider>();
+    return col != null ? col.bounds.center : dummyReaction.transform.position;
+    }
+    
+    // Hit test: physical SphereCast, OR (for IMU casts) within an angular cone of the dummy centre.
+    bool IsAimedAtDummy(Ray ray, bool useCone, out Vector3 point)
+    {
+    if (TryGetAimedDummy(ray, out point)) return true;
+    if (useCone && dummyReaction != null)
+    {
+        var toDummy = DummyCenter() - ray.origin;
+        if (toDummy.sqrMagnitude > .01f && Vector3.Angle(ray.direction, toDummy) <= imuAimToleranceDeg)
+        {
+        point = DummyCenter();
+        return true;
+        }
+    }
+    return false;
+    }
+    
+    static int SpellIndexFromName(string spell)
+    {
+        if (string.IsNullOrWhiteSpace(spell)) return -1;
+        return Array.IndexOf(SpellNames, spell.Trim().ToLowerInvariant());   // fire, water, wind, lightning
+    }
+    
+    // Always plays the spell. Only a real hit triggers the dummy's isHit animation.
+    bool CastSpellAtDummy(string spell, float confidence, string source, Ray aimRay, bool useCone)
+    {
+    if (!arenaReady || busy || dummyReaction == null || wandStyle < 0 ||
+        Time.time - lastSpellTime < 0.25f ||
+        float.IsNaN(confidence) || confidence < .55f || confidence > 1f) return false;
+    int spellIndex = SpellIndexFromName(spell);
+    if (spellIndex < 0) return false;
+    lastSpellTime = Time.time;
+    
+    Vector3 point = Vector3.zero;
+    bool hit = !dummyReaction.IsDown && IsAimedAtDummy(aimRay, useCone, out point);
+    
+    // TEMP DIAGNOSTIC: remove once aiming is tuned.
+    var toDummy = DummyCenter() - aimRay.origin;
+    Debug.Log($"[aim] {source} hit={hit} angle={Vector3.Angle(aimRay.direction, toDummy):0.0}deg " +
+                $"dist={toDummy.magnitude:0.0}m tolerance={imuAimToleranceDeg}deg");
+    
+    Vector3 destination;
+    if (hit) destination = point;
+    else
+    {
+        RaycastHit block;
+        destination = Physics.Raycast(aimRay, out block, 30f) ? block.point : aimRay.GetPoint(30f);
+    }
+    StartCoroutine(CastAtDummy(spellIndex, confidence, source, destination, hit));
+    return true;                                            // a cast happened, hit or miss
+    }
+    
+    IEnumerator CastAtDummy(int spellIndex, float confidence, string source, Vector3 destination, bool aimedAtDummy)
+    {
+    busy = true;
+    var color = SpellColors[spellIndex];
+    var spellName = SpellNames[spellIndex];
+    UpdateLabels(spellName.ToUpperInvariant() + (aimedAtDummy ? "  /  DUMMY" : "  /  MISSED"),
+        source + "  " + Mathf.Clamp01(confidence).ToString("P0"));
+    yield return StartCoroutine(SpellEffect(spellName, color, destination));
+    
+    if (!aimedAtDummy || dummyReaction == null)
+    {
+        UpdateLabels("MISSED", InputHint());                            // aim was off the dummy
+    }
+    else if (dummyReaction.TryHit(spellName))                         // only the matching element kills it
+    {
+        level2Hits++;
+        if (scoreText != null) scoreText.text = level2Hits + " HITS";
+        UpdateLabels("DIRECT HIT  /  " + level2Hits, InputHint());
+    }
+    else
+    {
+        UpdateLabels(spellName.ToUpperInvariant() + "  /  WRONG ELEMENT", "MATCH THE CRYSTAL COLOUR");
+    }
+    busy = false;
     }
 }
