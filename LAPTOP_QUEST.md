@@ -42,6 +42,13 @@ not track the physical wand's position in the room. Its grip stays at a fixed
 offset from the view, but its rotation now follows the IMU continuously, independent
 of the classifier. Desktop mouse aiming and clicks still work in the editor.
 
+The instruction board is fixed in the room to the left of the targets, at eye level,
+with large plain white lettering over a dark background. It does not follow head
+rotation or movement, and is positioned again only when you enter a new arena.
+Its lower section shows the current target's spell and exact motion;
+it switches automatically after each crystal and whenever the dummy changes element.
+During dummy recovery it asks you to wait for the next crystal.
+
 ## Real-time wand rotation
 
 The laptop integrates the calibrated gyroscope at the sensor rate and sends the

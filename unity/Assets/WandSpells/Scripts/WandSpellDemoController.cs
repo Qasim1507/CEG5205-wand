@@ -84,6 +84,9 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     bool arenaReady;
     bool[] broken;
     Camera viewCamera;
+    TextMesh gestureText;
+    Material hudPanelMaterial;
+    Transform hudRoot;
     // The only four spell types accepted by the game and the UDP classifier.
     static readonly string[] SpellNames = { "fire", "water", "wind", "lightning" };
     static readonly Color[] SpellColors = {
@@ -131,6 +134,8 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         for (var i = 0; i < targets.Length; ++i) crystalHome[i] = targets[i].localPosition;
         SetWandStyle(-1);
         viewCamera = Camera.main;
+        ConfigureReadableHud();
+        StartCoroutine(AnchorLobbyHudAfterTracking());
         wandRest = wand != null ? wand.localRotation : Quaternion.identity;
         Application.runInBackground = true;
         if (aimMarker != null) aimMarker.gameObject.SetActive(false);
@@ -161,6 +166,8 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         Cursor.visible = true;
         listening = false;
         receiver?.Close();
+        if (hudPanelMaterial != null) Destroy(hudPanelMaterial);
+        if (hudRoot != null) Destroy(hudRoot.gameObject);
         if (reader != null && reader.IsAlive) reader.Join(300);
     }
 
@@ -328,6 +335,99 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                 Debug.LogWarning("Invalid wand packet: " + exception.Message);
             }
         }
+        RefreshGestureHint();
+    }
+
+    void ConfigureReadableHud()
+    {
+        if (viewCamera == null) return;
+        hudRoot = new GameObject("Stationary room instruction board").transform;
+        AnchorHudInRoom();
+        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        PlaceHudText(statusText, font, new Vector3(0f, .16f, 0f), .028f);
+        PlaceHudText(scoreText, font, new Vector3(0f, .63f, 0f), .027f);
+        PlaceHudText(choiceText, font, new Vector3(0f, -.28f, 0f), .028f);
+        var hint = new GameObject("Current target - spell gesture instructions");
+        gestureText = hint.AddComponent<TextMesh>();
+        PlaceHudText(gestureText, font, new Vector3(0f, -.48f, 0f), .032f);
+        gestureText.gameObject.SetActive(false);
+        var panelTemplate = Resources.Load<Material>("WandHudBackground");
+        hudPanelMaterial = panelTemplate != null ? new Material(panelTemplate) : new Material(Shader.Find("Unlit/Color"));
+        hudPanelMaterial.color = new Color(.025f, .035f, .055f);
+        CreateHudPanel("Stationary instruction board background", new Vector3(0f, 0f, .03f), new Vector3(3.2f, 1.65f, 1f));
+    }
+
+    IEnumerator AnchorLobbyHudAfterTracking()
+    {
+        yield return new WaitForSeconds(.5f);
+        if (wandStyle < 0) AnchorHudInRoom();
+    }
+
+    void AnchorHudInRoom()
+    {
+        if (hudRoot == null || viewCamera == null) return;
+        var forward = Vector3.ProjectOnPlane(sceneRig != null ? sceneRig.forward : viewCamera.transform.forward, Vector3.up).normalized;
+        if (forward.sqrMagnitude < .1f) forward = Vector3.forward;
+        var right = Vector3.Cross(Vector3.up, forward);
+        var offset = forward * 3.2f - right * 2.8f;
+        hudRoot.position = viewCamera.transform.position + offset;
+        hudRoot.rotation = Quaternion.LookRotation(offset.normalized, Vector3.up);
+        // Placed once per room, never parented to or moved with the head camera.
+    }
+
+    void PlaceHudText(TextMesh text, Font font, Vector3 position, float size)
+    {
+        if (text == null) return;
+        text.transform.SetParent(hudRoot, false);
+        text.transform.localPosition = position;
+        text.transform.localRotation = Quaternion.identity;
+        text.transform.localScale = Vector3.one;
+        text.font = font;
+        text.GetComponent<MeshRenderer>().sharedMaterial = font.material;
+        text.fontSize = 64;
+        text.characterSize = size;
+        text.anchor = TextAnchor.MiddleCenter;
+        text.alignment = TextAlignment.Center;
+        text.lineSpacing = 1.15f;
+        text.color = Color.white;
+    }
+
+    GameObject CreateHudPanel(string label, Vector3 position, Vector3 scale)
+    {
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        panel.name = label;
+        panel.transform.SetParent(hudRoot, false);
+        panel.transform.localPosition = position;
+        panel.transform.localScale = scale;
+        Destroy(panel.GetComponent<Collider>());
+        panel.GetComponent<Renderer>().sharedMaterial = hudPanelMaterial;
+        return panel;
+    }
+
+    static string GestureInstruction(string spell)
+    {
+        switch (spell == null ? "" : spell.ToLowerInvariant()) {
+            case "fire": return "FIRE: SWIPE DOWN\nOne stroke: top to bottom";
+            case "water": return "WATER: CLOCKWISE CIRCLE\nOne full circle, then pause";
+            case "wind": return "WIND: SWIPE RIGHT\nOne stroke: left to right";
+            case "lightning": return "LIGHTNING: DRAW A Z\nRight, down-left, then right";
+            default: return "MATCH THE TARGET'S COLOUR\nPause briefly between gestures";
+        }
+    }
+
+    void RefreshGestureHint()
+    {
+        if (gestureText == null) return;
+        gestureText.gameObject.SetActive(wandStyle >= 0);
+        string instruction;
+        if (!arenaReady) instruction = "GET READY\nEntering the next arena";
+        else if (level2Active && dummyReaction != null)
+            instruction = dummyReaction.IsDown ? "TARGET RECOVERING\nWait for its next crystal" : GestureInstruction(dummyReaction.RequiredSpell);
+        else if (targets != null && selected < targets.Length) {
+            var target = targets[selected].GetComponent<CrystalTarget>();
+            instruction = GestureInstruction(target != null ? target.requiredSpell.ToString() : null);
+        } else instruction = GestureInstruction(null);
+        if (gestureText.text != instruction) gestureText.text = instruction;
     }
 
     void UpdateHeadAim()
@@ -448,6 +548,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             yield return null;
         }
         sceneRig.position = to;
+        AnchorHudInRoom();
         arenaReady = true;
         aimViewport = new Vector2(.5f, .5f);
         Cursor.lockState = CursorLockMode.Locked;
@@ -707,7 +808,20 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     }
 
     void UpdateLabels(string headline, string subline) {
-        if (statusText != null) statusText.text = headline + "\n" + subline;
+        if (statusText != null) statusText.text = WrapHudLine(headline) + "\n" + WrapHudLine(subline);
+    }
+
+    static string WrapHudLine(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return "";
+        var result = new StringBuilder();
+        int length = 0;
+        foreach (var word in line.Split(' ')) {
+            if (length > 0 && length + 1 + word.Length > 28) { result.Append('\n'); length = 0; }
+            if (length > 0) { result.Append(' '); length++; }
+            result.Append(word); length += word.Length;
+        }
+        return result.ToString();
     }
 
     // Implementation for Dummy Training Scene - Level 2
@@ -732,6 +846,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         yield return null;
     }
     sceneRig.position = to;                                // VR: snaps here, same as EnterArena
+    AnchorHudInRoom();
     
     // ---- same "start playing" setup that EnterArena does ----
     level2Active = true;                                   // switches Update() from crystals to the dummy

@@ -89,6 +89,12 @@ your IMU; head direction controls the shot, so a gesture does not pull the aim o
 target. The left joystick is not needed. See [the integration guide](LAPTOP_QUEST.md) for gesture/effect
 mapping, rotation details, logs and advanced options.
 
+Instructions appear on a large, dark board fixed in the room, to the left of the
+targets at eye level. It stays still when you turn your head and is placed again
+when you enter the next arena. Its gesture card shows the current target's motion: **fire = swipe down**,
+**water = clockwise circle**, **wind = swipe right**, **lightning = draw a Z**
+(right, diagonally down-left, then right). It updates when the dummy changes element.
+
 ### Manual launch / useful options
 
 Run these from the repo folder; virtual-environment activation is optional.

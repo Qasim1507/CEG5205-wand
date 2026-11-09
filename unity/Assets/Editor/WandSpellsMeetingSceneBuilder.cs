@@ -372,6 +372,14 @@ public static class WandSpellsMeetingSceneBuilder
     {
         QuestViewSetup.ConfigureProject();
         PlayerSettings.Android.forceInternetPermission = true;
+        // A Resources material keeps the HUD's unlit shader in the Android build.
+        EnsureFolder(Root + "/Resources");
+        var hudMaterialPath = Root + "/Resources/WandHudBackground.mat";
+        if (AssetDatabase.LoadAssetAtPath<Material>(hudMaterialPath) == null) {
+            var hudMaterial = new Material(Shader.Find("Unlit/Color"));
+            hudMaterial.color = new Color(.025f, .035f, .055f);
+            AssetDatabase.CreateAsset(hudMaterial, hudMaterialPath);
+        }
         if (!System.IO.File.Exists(ScenePath)) BuildScene();
         var previousId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
         var previousName = PlayerSettings.productName;

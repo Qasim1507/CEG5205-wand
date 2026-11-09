@@ -181,4 +181,54 @@ public class WandSequenceValidation
         Assert.IsFalse(marker.gameObject.activeSelf, "Looking away must move the aim off target");
         UnityEngine.Object.DestroyImmediate(root);
     }
+
+    [UnityTest]
+    public IEnumerator ReadableHudShowsTheMotionForEachCurrentTarget()
+    {
+        var root = new GameObject("readable HUD test");
+        var head = new GameObject("HUD camera").AddComponent<Camera>();
+        head.tag = "MainCamera";
+        head.transform.SetParent(root.transform);
+        var type = Type.GetType("WandSpellDemoController, Assembly-CSharp");
+        var controller = root.AddComponent(type);
+        var crystalType = Type.GetType("CrystalTarget, Assembly-CSharp");
+        var spells = new[] { "Fire", "Water", "Wind", "Lightning" };
+        var expected = new[] { "top to bottom", "CLOCKWISE", "left to right", "down-left" };
+        var targets = new Transform[4];
+        for (int i = 0; i < targets.Length; i++) {
+            targets[i] = new GameObject(spells[i]).transform;
+            targets[i].SetParent(root.transform);
+            var target = targets[i].gameObject.AddComponent(crystalType);
+            var field = crystalType.GetField("requiredSpell");
+            field.SetValue(target, Enum.Parse(field.FieldType, spells[i]));
+        }
+        type.GetField("targets").SetValue(controller, targets);
+        type.GetField("udpPort").SetValue(controller, 0);
+        var status = new GameObject("status").AddComponent<TextMesh>();
+        status.transform.SetParent(root.transform);
+        type.GetField("statusText").SetValue(controller, status);
+        yield return null;
+        type.GetMethod("SetWandStyle", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, new object[] { 0 });
+        var hint = (TextMesh)type.GetField("gestureText", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller);
+        Assert.GreaterOrEqual(Vector3.Distance(head.transform.position, status.transform.position), 3f);
+        Assert.Less(Mathf.Abs(status.transform.position.y - head.transform.position.y), .5f,
+            "Status must be near eye level, not above the player's view");
+        var fixedPosition = hint.transform.position;
+        var fixedRotation = hint.transform.rotation;
+        head.transform.position += Vector3.right * .4f;
+        head.transform.rotation = Quaternion.Euler(20f, 70f, 0f);
+        for (int i = 0; i < targets.Length; i++) {
+            type.GetField("selected", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, i);
+            yield return null;
+            StringAssert.Contains(expected[i], hint.text);
+            var size = hint.GetComponent<Renderer>().localBounds.size;
+            Assert.Less(size.x, 3.05f, "Gesture text should fit its background: " + size);
+            Assert.Less(size.y, .65f, "Gesture text should fit its background: " + size);
+            Assert.Less(Vector3.Distance(fixedPosition, hint.transform.position), .001f,
+                "Instructions must stay fixed in the room as the head moves");
+            Assert.Less(Quaternion.Angle(fixedRotation, hint.transform.rotation), .01f);
+        }
+        UnityEngine.Object.Destroy(root);
+        yield return null;
+    }
 }
