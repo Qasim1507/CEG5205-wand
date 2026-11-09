@@ -30,8 +30,14 @@ Wait for **Quest link: CONNECTED** in the laptop output.
 
 In Quest, look directly at one of the three displayed wands for 1.2 seconds to
 select it. The gate opens and you enter the arena. Then perform a gesture and
-pause briefly to finish it. The recognized spell hits the current glowing crystal.
-This version retains the game's automatic targeting for sensor casts; it does
+pause briefly to finish it. Match the active crystal's element to break it.
+After the five crystals, the game enters the moving-dummy stage. On Quest, look
+at the dummy to aim the centered crosshair, then cast the element matching its
+crystal (red fire, blue water, green wind, yellow lightning). Head tracking steers
+the shot independently of wand gestures; the target marker shows when the ray
+is on the dummy. On desktop, aiming uses the mouse crosshair.
+The crystal stage retains automatic targeting for sensor casts; the dummy stage
+requires aiming. The system does
 not track the physical wand's position in the room. Its grip stays at a fixed
 offset from the view, but its rotation now follows the IMU continuously, independent
 of the classifier. Desktop mouse aiming and clicks still work in the editor.
@@ -63,13 +69,13 @@ be a separate way to obtain position.
 | Gesture | Dataset spell | Unity effect |
 | --- | --- | --- |
 | Vertical swipe | fire | fire |
-| Horizontal swipe | wind | arcane |
-| Zigzag | lightning | storm |
-| Circle | water | frost |
+| Horizontal swipe | wind | wind (green) |
+| Zigzag | lightning | lightning (yellow) |
+| Circle | water | water (blue) |
 | Idle / rejected / confidence below 55% | none | no spell |
 
-Dataset/model labels are unchanged. The existing fifth `shatter` effect has no
-trained gesture. It remains available for desktop testing.
+Dataset/model labels are unchanged. The updated game accepts the four canonical
+elements fire, water, wind and lightning directly.
 
 Predictions go through the same segmentation/features as dataset collection.
 Only completed confident gestures are sent. Ping replies verify that the Unity

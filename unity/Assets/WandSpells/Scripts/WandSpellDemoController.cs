@@ -115,9 +115,11 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     [Tooltip("Level 2: also allow left click to cast. Turn off once IMU gestures are the only way to cast.")]
     [SerializeField] private bool allowMouseClickCast = true;
     
-    // Crosshair ray: same aim the mouse uses (falls back to the camera centre in VR).
+    // Desktop uses the mouse reticle; Quest aims along the tracked head direction.
     Ray GetCrosshairRay()
     {
+    if (XRSettings.isDeviceActive && viewCamera != null)
+        return new Ray(viewCamera.transform.position, viewCamera.transform.forward);
     var vp = new Vector3(aimViewport.x, aimViewport.y, 0f);
     return viewCamera != null ? viewCamera.ViewportPointToRay(vp) : new Ray(wand.position, wand.forward);
     }
@@ -281,6 +283,9 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             }
         }
  
+        if (XRSettings.isDeviceActive && wandStyle >= 0 && arenaReady && viewCamera != null)
+            UpdateHeadAim();
+
         while (true) {
             IncomingPacket message;
             lock (incoming) {
@@ -312,7 +317,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                         rotation.z * rotation.z + rotation.w * rotation.w;
                     if (!level2Active && !hasPose && lengthSquared > 0.1f) wand.localRotation = recenter * rotation.normalized;   // LEVEL2
                 }
-                // LEVEL2: in level 2 the IMU only classifies the gesture; aim comes from the mouse crosshair.
+                // The classifier selects the spell; the mouse/head crosshair selects its direction.
                 bool cast = !string.IsNullOrEmpty(packet.spell) &&
                     (level2Active
                         ? CastSpellAtDummy(packet.spell, packet.conf, "IMU / UDP", GetCrosshairRay(), false)
@@ -325,9 +330,25 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         }
     }
 
+    void UpdateHeadAim()
+    {
+        aimViewport = new Vector2(.5f, .5f);
+        if (crosshair != null) {
+            crosshair.localPosition = new Vector3(0f, 0f, 1.2f);
+            crosshair.gameObject.SetActive(true);
+        }
+        var ray = new Ray(viewCamera.transform.position, viewCamera.transform.forward);
+        Vector3 point;
+        bool hit = level2Active ? TryGetAimedDummy(ray, out point) : TryGetAimedCrystal(ray, out point);
+        if (aimMarker != null) {
+            aimMarker.gameObject.SetActive(hit);
+            if (hit) aimMarker.position = point;
+        }
+    }
+
     void ApplyPose(SensorPacket packet)
     {
-        if (level2Active || !arenaReady || wand == null || string.IsNullOrEmpty(packet.session) ||
+        if ((level2Active && !XRSettings.isDeviceActive) || !arenaReady || wand == null || string.IsNullOrEmpty(packet.session) ||
             packet.pose_id <= 0 || packet.q == null || packet.q.Length != 4) return;
         var rotation = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
         foreach (var value in packet.q)
@@ -361,7 +382,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     {
         // Freeze the last orientation on link loss, rather than replaying motion.
         // World rotation keeps a head turn from also rotating the physical wand.
-        if (!level2Active && hasPose && wand != null && arenaReady && Time.unscaledTime - lastPoseAt < .5f)
+        if ((!level2Active || XRSettings.isDeviceActive) && hasPose && wand != null && arenaReady && Time.unscaledTime - lastPoseAt < .5f)
             wand.rotation = Quaternion.Slerp(wand.rotation, poseTarget,
                 1f - Mathf.Exp(-35f * Time.unscaledDeltaTime));
     }
@@ -437,7 +458,9 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         UpdateLabels("CRYSTAL 1 IS ACTIVE", InputHint());
     }
 
-    string InputHint() => XRSettings.isDeviceActive ? "MOVE THE REAL WAND  /  A OR X TO CENTER" : "MOVE MOUSE TO AIM  /  LEFT CLICK TO FIRE";
+    string InputHint() => XRSettings.isDeviceActive
+        ? (level2Active ? "LOOK TO AIM / MATCH COLOUR / GESTURE TO CAST" : "MATCH CRYSTAL COLOUR / GESTURE TO CAST")
+        : "MOVE MOUSE TO AIM  /  LEFT CLICK TO FIRE";
 
     public bool CastSpell(string spell, float confidence, string source) {
         if (string.IsNullOrWhiteSpace(spell) || float.IsNaN(confidence) || confidence < .55f || confidence > 1f ||

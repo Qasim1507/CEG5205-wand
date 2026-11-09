@@ -98,7 +98,7 @@ public class WandSequenceValidation
     }
 
     [UnityTest]
-    public IEnumerator FiveSpellsShatterInOrderAndReset()
+    public IEnumerator MatchingSpellsShatterInOrderThenEnterDummyStage()
     {
         var root = new GameObject("wand test root");
         var wand = new GameObject("wand").transform;
@@ -114,6 +114,8 @@ public class WandSequenceValidation
         for (int i = 0; i < 3; i++) styles[i] = new GameObject("style " + i).transform;
         Set("wandStyles", styles);
         var targets = new Transform[5]; var renderers = new Renderer[5];
+        var spells = new[] { "fire", "water", "wind", "lightning", "fire" };
+        var crystalType = Type.GetType("CrystalTarget, Assembly-CSharp");
         for (int i = 0; i < 5; i++)
         {
             var crystal = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -121,12 +123,20 @@ public class WandSequenceValidation
             crystal.transform.position = new Vector3(i, 1f, 1f);
             targets[i] = crystal.transform;
             renderers[i] = crystal.GetComponent<Renderer>();
+            var requirement = crystal.AddComponent(crystalType);
+            var required = crystalType.GetField("requiredSpell");
+            required.SetValue(requirement, Enum.Parse(required.FieldType, spells[i], true));
         }
         Set("targets", targets); Set("targetCrystals", renderers);
         yield return null;
         type.GetMethod("SetWandStyle", BindingFlags.NonPublic | BindingFlags.Instance)
             .Invoke(controller, new object[] { 0 });
-        var spells = new[] { "fire", "frost", "storm", "arcane", "shatter" };
+        var rig = new GameObject("level transition rig").transform;
+        rig.SetParent(root.transform);
+        Set("sceneRig", rig);
+        type.GetMethod("CastSpell").Invoke(controller, new object[] { "water", 1f, "TEST WRONG ELEMENT" });
+        yield return new WaitForSeconds(1.45f);
+        Assert.IsTrue(targets[0].gameObject.activeSelf, "Wrong spell must not break a crystal");
         for (int i = 0; i < 5; i++)
         {
             type.GetMethod("CastSpell").Invoke(controller, new object[] { spells[i], 1f, "TEST" });
@@ -135,10 +145,40 @@ public class WandSequenceValidation
             if (i < 4) Assert.IsTrue(targets[i+1].gameObject.activeSelf,
                 "Next crystal disappeared too soon");
         }
-        yield return new WaitForSeconds(2.8f);
-        foreach (var crystal in targets)
-            Assert.IsTrue(crystal.gameObject.activeSelf, "Crystals did not reset");
+        yield return new WaitForSeconds(4.8f);
+        Assert.IsTrue((bool)type.GetField("level2Active", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller),
+            "Clearing the crystals must enter the new dummy stage");
         UnityEngine.Object.Destroy(root);
         foreach (var style in styles) if (style != null) UnityEngine.Object.Destroy(style.gameObject);
+    }
+
+    [Test]
+    public void HeadAimTracksCameraAndIgnoresWandAndOldMouseOffset()
+    {
+        var root = new GameObject("head aiming test");
+        var type = Type.GetType("WandSpellDemoController, Assembly-CSharp");
+        var controller = root.AddComponent(type);
+        var head = new GameObject("head").AddComponent<Camera>();
+        head.transform.SetParent(root.transform);
+        var target = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform;
+        target.SetParent(root.transform);
+        target.position = new Vector3(0, 0, 3);
+        var reticle = new GameObject("crosshair").transform;
+        reticle.SetParent(head.transform);
+        var marker = new GameObject("hit marker").transform;
+        marker.SetParent(root.transform);
+        type.GetField("targets").SetValue(controller, new[] { target });
+        type.GetField("crosshair").SetValue(controller, reticle);
+        type.GetField("aimMarker").SetValue(controller, marker);
+        type.GetField("viewCamera", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, head);
+        type.GetField("aimViewport", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, new Vector2(.9f, .9f));
+        var update = type.GetMethod("UpdateHeadAim", BindingFlags.NonPublic | BindingFlags.Instance);
+        update.Invoke(controller, null);
+        Assert.IsTrue(marker.gameObject.activeSelf, "Looking at the target should show its hit marker");
+        Assert.AreEqual(new Vector3(0, 0, 1.2f), reticle.localPosition);
+        head.transform.rotation = Quaternion.Euler(0, 80, 0);
+        update.Invoke(controller, null);
+        Assert.IsFalse(marker.gameObject.activeSelf, "Looking away must move the aim off target");
+        UnityEngine.Object.DestroyImmediate(root);
     }
 }
