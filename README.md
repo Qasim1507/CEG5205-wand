@@ -181,7 +181,8 @@ The desktop launcher uses connected Arduinos as controllers and selects the
 match automatically. One wand starts a solo match against the Wand Bot; two
 wands start local PvP. Each wand has its own gesture recognition. Spells
 automatically fly toward the opponent, both players start with 100 health, and
-lightning hits hardest. The bot attacks periodically and sometimes misses.
+lightning hits hardest. In solo mode, the bot reacts to casting pace and changes
+its attack speed and accuracy as the health lead changes.
 The first player to lose all health loses the round; health resets after a
 short pause. The IMU does not track room position, so spells automatically
 target the opponent rather than using physical aiming or dodging.

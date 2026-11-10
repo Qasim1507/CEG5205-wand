@@ -38,9 +38,11 @@ The desktop game selects its mode from the connected Arduino count. Connect one
 Arduino for a match against the Wand Bot, or two for local PvP. In Unity Editor,
 open this scene in Play mode and run `python/play_wand.py` from the repository
 root. Each wand is recognized independently, and spells automatically travel
-to the opponent. The bot attacks periodically and sometimes misses. Players
-start with 100 health; lightning deals the most damage. The first to reach zero
-loses, and the next round begins after a short pause. Physical room position is
+to the opponent. The Wand Bot adjusts its response speed and accuracy as the
+health lead changes. Players start with 100 health; lightning deals the most
+damage. The first to reach zero loses, then a large victory sign and impact
+burst appear before the next round. The duel arena uses glowing runes, floating
+crystals, staffs, spell trails, and impact sparks. Physical room position is
 not tracked, so this mode does not use wand aiming or dodging. The packaged
 desktop launcher build steps are in the repository README. This mode does not
 run on the included Quest APK.
