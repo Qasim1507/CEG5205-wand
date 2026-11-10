@@ -4,6 +4,9 @@ Move a physical IMU wand to rotate a virtual wand and cast spells in a Quest 3
 wizard game. A trained classifier runs on the laptop; the Quest runs the included
 Unity Android app. The repository also contains the recording and training tools.
 
+For step-by-step setup, desktop play, Quest play, and mixed-device PvP, see the
+[Player Manual](PLAYER_MANUAL.md).
+
 ```text
 MPU-6050 → Arduino Mega → USB → laptop Python → Wi-Fi → Quest 3
                                 live rotation + recognized spells
