@@ -180,12 +180,13 @@ also play with the mouse alone using the desktop controls below.
 The desktop launcher uses connected Arduinos as controllers and selects the
 match automatically. One wand starts a solo match against the Wand Bot; two
 wands start local PvP. Each wand has its own gesture recognition. Spells
-automatically fly toward the opponent, both players start with 100 health, and
-lightning hits hardest. In solo mode, the bot reacts to casting pace and changes
-its attack speed and accuracy as the health lead changes.
-The first player to lose all health loses the round; health resets after a
-short pause. The IMU does not track room position, so spells automatically
-target the opponent rather than using physical aiming or dodging.
+use the wand's orientation for aim, and a spell only hits when its aim ray reaches
+the opponent. Both players start with 100 health, and lightning hits hardest.
+Solo mode uses the same level against a bot; the bot moves and adapts its casting
+pace to the health lead. In two-player mode, the existing level is shown in
+split-screen, with each player moving from the keyboard. The first player to
+lose all health loses the round; health resets after a short pause. The IMUs
+track wand orientation, while the keyboard handles movement.
 
 To try the flow in Unity Editor, open
 `unity/Assets/Scenes/WandSpellsMeetingDemo.unity` and press **Play**, connect one
@@ -207,6 +208,10 @@ Keep each wand still until calibration finishes. The Unity game selects bot or
 PvP mode from the number of connected controllers. Press **R** in a recognition
 window to recenter the wand(s); press **Q/Esc** to quit. Port order can be set
 with `--player1-port` and optional `--player2-port`.
+
+In the game, **WASD** moves Player 1. In two-wand PvP, **arrow keys** move
+Player 2. Aim by moving each wand; recognized gestures cast spells. Press **F2**
+to restart a round.
 
 ### Build a one-file desktop launcher
 

@@ -110,6 +110,36 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     Vector3[] crystalHome;
     Vector2 aimViewport = new Vector2(.5f, .5f);
     bool skipMouseDelta;
+    bool desktopDuelActive;
+
+    public Transform DesktopRig => sceneRig;
+
+    /// <summary>Skip the wand-selection tutorial and keep its level as the desktop duel map.</summary>
+    public void ActivateDesktopDuel() {
+        desktopDuelActive = true;
+        wandStyle = 0;
+        arenaReady = true;
+        if (sceneRig != null) {
+            sceneRig.position = new Vector3(-2f, 0f, -3.25f);
+            sceneRig.rotation = Quaternion.Euler(0f, 90f, 0f);
+        }
+        if (wandStyles != null)
+            for (int i = 0; i < wandStyles.Length; i++)
+                if (wandStyles[i] != null) wandStyles[i].gameObject.SetActive(i == 0);
+        if (choiceText != null) choiceText.gameObject.SetActive(false);
+        if (scoreText != null) scoreText.gameObject.SetActive(false);
+        if (crosshair != null) crosshair.gameObject.SetActive(false);
+        if (aimMarker != null) aimMarker.gameObject.SetActive(false);
+        if (hudRoot != null) hudRoot.gameObject.SetActive(false);
+        if (entranceDoors != null) {
+            if (entranceDoors.Length > 0 && entranceDoors[0] != null)
+                entranceDoors[0].localPosition += Vector3.left * 1.7f;
+            if (entranceDoors.Length > 1 && entranceDoors[1] != null)
+                entranceDoors[1].localPosition += Vector3.right * 1.7f;
+        }
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
 
     [SerializeField] private Renderer runicAlcoveShadow;   // the Renderer on "Runic alcove shadow"
     [SerializeField] private Material whiteMaterial;       // your existing White material asset
@@ -211,6 +241,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         bool pressed = rightPressed || leftPressed;
         if (pressed && !recenterButtonDown) RecenterWand();
         recenterButtonDown = pressed;
+        if (!desktopDuelActive) {
         // The physical wand is the spell input. Head gaze lets Quest users
         // choose a cosmetic wand without a keyboard or a spare controller.
         if (XRSettings.isDeviceActive && wandStyle < 0 && viewCamera != null) {
@@ -302,6 +333,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
  
         if (XRSettings.isDeviceActive && wandStyle >= 0 && arenaReady && viewCamera != null)
             UpdateHeadAim();
+        }
 
         while (true) {
             IncomingPacket message;

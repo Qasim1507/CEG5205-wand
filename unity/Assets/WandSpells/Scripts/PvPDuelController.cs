@@ -14,6 +14,12 @@ public sealed class PvPDuelController : MonoBehaviour {
     readonly float[] lastCast = { -10f, -10f };
     readonly Quaternion[] homeRotation = { Quaternion.identity, Quaternion.identity };
     readonly Transform[] wands = new Transform[2];
+    readonly Transform[] playerRigs = new Transform[2];
+    readonly Camera[] playerCameras = new Camera[2];
+    readonly Transform[] playerBodies = new Transform[2];
+    readonly Quaternion[] cameraHomeRotation = { Quaternion.identity, Quaternion.identity };
+    readonly Quaternion[] poseNeutral = { Quaternion.identity, Quaternion.identity };
+    readonly bool[] poseCalibrated = new bool[2];
     readonly Transform[] healthFill = new Transform[2];
     readonly List<Transform> floatingCrystals = new List<Transform>();
     readonly List<Vector3> floatingCrystalHomes = new List<Vector3>();
@@ -31,6 +37,7 @@ public sealed class PvPDuelController : MonoBehaviour {
     int lastHumanSpell = -1;
     int lastBotSpell = -1;
     float lastHumanCastAt = -10f;
+    Transform botHome;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Install() {
@@ -52,6 +59,7 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void Update() {
         if (started && Input.GetKeyDown(KeyCode.F2)) ResetRound();
+        if (started && !roundOver) UpdatePlayerMovement();
         if (started && botOpponent && !roundOver && Time.time >= nextBotCastAt)
             BotAttack();
         if (centerRune != null) {
@@ -77,23 +85,89 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void BeginDuel() {
         if (started) return;
+        var demo = FindObjectOfType<WandSpellDemoController>();
+        if (demo != null) demo.ActivateDesktopDuel();
         gameCamera = Camera.main;
         if (gameCamera == null) return;
         started = true;
+        playerRigs[0] = demo != null && demo.DesktopRig != null ? demo.DesktopRig : gameCamera.transform;
+        playerCameras[0] = gameCamera;
+        playerRigs[0].position = new Vector3(-2f, 0f, -3.25f);
+        playerRigs[0].rotation = Quaternion.Euler(0f, 90f, 0f);
+        cameraHomeRotation[0] = playerRigs[0].rotation;
+        gameCamera.rect = botOpponent ? new Rect(0f, 0f, 1f, 1f) : new Rect(0f, 0f, .5f, 1f);
+        gameCamera.fieldOfView = 72f;
 
-        // Clear the single-player meeting scene from view, then make a simple
-        // side-on arena that two people can share on one monitor.
-        foreach (Renderer item in FindObjectsOfType<Renderer>()) item.enabled = false;
-        gameCamera.transform.position = new Vector3(0f, 6f, -14f);
-        gameCamera.transform.rotation = Quaternion.LookRotation(new Vector3(0f, 1.1f, 0f) - gameCamera.transform.position);
-        gameCamera.fieldOfView = 48f;
-        CreateArena();
-        CreatePlayer(0, new Vector3(-4f, 0f, 0f), new Color(.18f, .70f, 1f));
-        CreatePlayer(1, new Vector3(4f, 0f, 0f), new Color(1f, .32f, .20f));
-        banner = MakeText(botOpponent ? "YOU VS THE WAND BOT" : "CAST YOUR SPELLS",
-            new Vector3(0f, 4.75f, 0f), 1.8f, Color.white);
-        CreateVictoryPanel();
+        var secondRig = new GameObject("Player 2 FPS camera rig").transform;
+        secondRig.position = new Vector3(2f, 0f, -3.25f);
+        secondRig.rotation = Quaternion.Euler(0f, -90f, 0f);
+        playerRigs[1] = secondRig;
+        cameraHomeRotation[1] = secondRig.rotation;
+        var secondCameraObject = new GameObject("Player 2 camera");
+        secondCameraObject.transform.SetParent(secondRig, false);
+        secondCameraObject.transform.localPosition = new Vector3(0f, 1.65f, 0f);
+        secondCameraObject.transform.localRotation = Quaternion.identity;
+        playerCameras[1] = secondCameraObject.AddComponent<Camera>();
+        playerCameras[1].fieldOfView = 72f;
+        playerCameras[1].rect = new Rect(.5f, 0f, .5f, 1f);
+        playerCameras[1].depth = gameCamera.depth + 1;
+        playerCameras[1].allowHDR = gameCamera.allowHDR;
+        playerCameras[1].allowMSAA = gameCamera.allowMSAA;
+        playerCameras[1].clearFlags = gameCamera.clearFlags;
+        playerCameras[1].backgroundColor = gameCamera.backgroundColor;
+        playerCameras[1].enabled = !botOpponent;
+
+        CreateFpsDuelist(0, new Vector3(-2f, 0f, -3.25f), new Color(.18f, .70f, 1f));
+        CreateFpsDuelist(1, new Vector3(2f, 0f, -3.25f), new Color(1f, .32f, .20f));
+        botHome = playerRigs[1];
         UpdateHealthUi();
+    }
+
+    void CreateFpsDuelist(int index, Vector3 position, Color color) {
+        var body = MakePrimitive(index == 0 ? "Blue duelist" : "Red duelist",
+            PrimitiveType.Capsule, position + Vector3.up * .95f,
+            new Vector3(.75f, .95f, .75f), color, true);
+        var hitbox = body.AddComponent<CapsuleCollider>();
+        hitbox.height = 1.9f;
+        hitbox.radius = .38f;
+        hitbox.center = Vector3.zero;
+        playerBodies[index] = body.transform;
+        string asset = index == 0 ? "wand01_blue" : "wand01_red";
+        var wand = MakeAssetVisual(asset, "Player " + (index + 1) + " wand visual",
+            position + new Vector3(index == 0 ? .38f : -.38f, 1.15f, .1f),
+            Vector3.one * .65f, PrimitiveType.Cylinder, new Vector3(.10f, .55f, .10f), color);
+        wands[index] = wand.transform;
+    }
+
+    void UpdatePlayerMovement() {
+        MovePlayer(0, KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D);
+        if (!botOpponent) MovePlayer(1, KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.LeftArrow, KeyCode.RightArrow);
+        else if (botHome != null) {
+            float side = Mathf.Sin(Time.time * .75f) * 1.35f;
+            botHome.position = new Vector3(2f, 0f, -3.25f + side);
+            if (playerBodies[1] != null) playerBodies[1].position = botHome.position + Vector3.up * .95f;
+        }
+        for (int i = 0; i < 2; i++) {
+            if (playerBodies[i] != null && playerRigs[i] != null) {
+                playerBodies[i].position = playerRigs[i].position + Vector3.up * .95f;
+                playerBodies[i].rotation = Quaternion.Euler(0f, playerRigs[i].eulerAngles.y, 0f);
+            }
+        }
+    }
+
+    void MovePlayer(int index, KeyCode forward, KeyCode backward, KeyCode left, KeyCode right) {
+        var rig = playerRigs[index];
+        if (rig == null) return;
+        float forwardAxis = (Input.GetKey(forward) ? 1f : 0f) - (Input.GetKey(backward) ? 1f : 0f);
+        float sideAxis = (Input.GetKey(right) ? 1f : 0f) - (Input.GetKey(left) ? 1f : 0f);
+        Vector3 flatForward = Vector3.ProjectOnPlane(rig.forward, Vector3.up).normalized;
+        Vector3 flatRight = Vector3.ProjectOnPlane(rig.right, Vector3.up).normalized;
+        Vector3 move = (flatForward * forwardAxis + flatRight * sideAxis);
+        if (move.sqrMagnitude > 1f) move.Normalize();
+        Vector3 next = rig.position + move * (4.2f * Time.deltaTime);
+        next.x = Mathf.Clamp(next.x, -8f, 8f);
+        next.z = Mathf.Clamp(next.z, -10f, 2f);
+        rig.position = next;
     }
 
     void CreateArena() {
@@ -260,9 +334,15 @@ public sealed class PvPDuelController : MonoBehaviour {
         if (player < 1 || player > 2) return;
         if (!started) BeginDuel();
         var index = player - 1;
+        if (!poseCalibrated[index]) {
+            poseNeutral[index] = pose;
+            poseCalibrated[index] = true;
+        }
+        var relativePose = Quaternion.Inverse(poseNeutral[index]) * pose;
+        if (playerRigs[index] != null)
+            playerRigs[index].rotation = cameraHomeRotation[index] * relativePose;
         if (wands[index] != null)
-            wands[index].rotation = Quaternion.Slerp(wands[index].rotation,
-                homeRotation[index] * pose, Time.deltaTime * 10f);
+            wands[index].rotation = cameraHomeRotation[index] * relativePose;
     }
 
     void OnCast(int player, string spell, float confidence) {
@@ -280,7 +360,21 @@ public sealed class PvPDuelController : MonoBehaviour {
             nextBotCastAt = Mathf.Min(nextBotCastAt, Time.time + reaction);
             lastHumanCastAt = Time.time;
         }
-        StartCoroutine(SpellFlight(player - 1, spellIndex));
+        int attacker = player - 1;
+        var aimCamera = playerCameras[attacker];
+        bool landed = false;
+        Vector3 impact = playerBodies[1 - attacker] != null
+            ? playerBodies[1 - attacker].position : Vector3.zero;
+        if (aimCamera != null) {
+            Ray ray = new Ray(aimCamera.transform.position, aimCamera.transform.forward);
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit, 40f)) {
+                impact = hit.point;
+                landed = hit.transform == playerBodies[1 - attacker] ||
+                    (playerBodies[1 - attacker] != null && hit.transform.IsChildOf(playerBodies[1 - attacker]));
+            }
+        }
+        StartCoroutine(SpellFlight(attacker, spellIndex, landed, impact));
     }
 
     void BotAttack() {
@@ -297,7 +391,8 @@ public sealed class PvPDuelController : MonoBehaviour {
         }
         lastBotSpell = spellIndex;
         if (banner != null) banner.text = "WAND BOT CASTS " + SpellName(spellIndex);
-        StartCoroutine(SpellFlight(1, spellIndex));
+        StartCoroutine(SpellFlight(1, spellIndex, lands,
+            playerBodies[0] != null ? playerBodies[0].position : Vector3.zero));
     }
 
     float BotPressure() {
@@ -316,12 +411,18 @@ public sealed class PvPDuelController : MonoBehaviour {
         return choice;
     }
 
-    IEnumerator SpellFlight(int attacker, int spellIndex, bool lands = true) {
+    IEnumerator SpellFlight(int attacker, int spellIndex, bool lands = true, Vector3? impactPoint = null) {
         int defender = 1 - attacker;
         var color = SpellColor(spellIndex);
-        Vector3 origin = wands[attacker] != null ? wands[attacker].position :
-            new Vector3(attacker == 0 ? -4f : 4f, 1.7f, 0f);
-        Vector3 target = new Vector3(defender == 0 ? -4f : 4f, 1.5f, 0f);
+        var aimCamera = playerCameras[attacker];
+        Vector3 origin = aimCamera != null
+            ? aimCamera.transform.position + aimCamera.transform.forward * .45f
+            : (wands[attacker] != null ? wands[attacker].position : Vector3.up);
+        Vector3 defenderPosition = playerBodies[defender] != null
+            ? playerBodies[defender].position : Vector3.zero;
+        Vector3 target = impactPoint ?? defenderPosition;
+        if (!lands && aimCamera != null && target == defenderPosition)
+            target = aimCamera.transform.position + aimCamera.transform.forward * 18f;
         string[] orbNames = { "orb03_red", "orb03_blue", "orb03_green", "orb03_yellow" };
         var orb = MakeAssetVisual(orbNames[spellIndex], "PvP " + SpellName(spellIndex) + " spell",
             origin, Vector3.one * .58f, PrimitiveType.Sphere, Vector3.one * .45f, color);
@@ -440,6 +541,61 @@ public sealed class PvPDuelController : MonoBehaviour {
                     2.6f + 1.6f * (1f - ratio), 3.0f, 0f);
             }
         }
+    }
+
+    void OnGUI() {
+        if (!started) return;
+        float half = Screen.width * .5f;
+        if (botOpponent) {
+            DrawHealthPanel(0, 18f, 202f, "YOU");
+            DrawHealthPanel(1, Screen.width - 220f, 202f, "WAND BOT");
+        } else {
+            DrawHealthPanel(0, 18f, half - 36f, "PLAYER 1");
+            DrawHealthPanel(1, half + 18f, half - 36f, "PLAYER 2");
+        }
+
+        var titleStyle = new GUIStyle(GUI.skin.label) {
+            alignment = TextAnchor.UpperCenter,
+            fontSize = Mathf.Clamp(Screen.height / 28, 18, 30),
+            fontStyle = FontStyle.Bold
+        };
+        titleStyle.normal.textColor = Color.white;
+        GUI.Label(new Rect(0f, 18f, Screen.width, 42f),
+            botOpponent ? "WAND DUEL  ·  YOU VS BOT" : "WAND DUEL  ·  LOCAL PVP", titleStyle);
+
+        var hintStyle = new GUIStyle(GUI.skin.label) {
+            alignment = TextAnchor.LowerCenter,
+            fontSize = Mathf.Clamp(Screen.height / 58, 12, 18)
+        };
+        hintStyle.normal.textColor = new Color(.82f, .9f, 1f);
+        GUI.Label(new Rect(0f, Screen.height - 36f, Screen.width, 28f),
+            botOpponent ? "WASD to move  ·  Aim with your wand  ·  F2 restarts" :
+                "P1: WASD  ·  P2: Arrow keys  ·  Aim with each wand  ·  F2 restarts", hintStyle);
+        if (!botOpponent) GUI.Box(new Rect(half - 1f, 0f, 2f, Screen.height), GUIContent.none);
+
+        if (roundOver) {
+            var resultStyle = new GUIStyle(GUI.skin.box) {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.Clamp(Screen.height / 12, 30, 64),
+                fontStyle = FontStyle.Bold
+            };
+            resultStyle.normal.textColor = new Color(1f, .83f, .2f);
+            GUI.Box(new Rect(Screen.width * .2f, Screen.height * .37f,
+                Screen.width * .6f, Screen.height * .22f),
+                botOpponent ? (health[0] > 0 ? "YOU WIN!" : "BOT WINS") :
+                    (health[0] > 0 ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!"), resultStyle);
+        }
+    }
+
+    void DrawHealthPanel(int index, float x, float width, string label) {
+        float y = 64f;
+        GUI.Box(new Rect(x, y, width, 48f), label + "   " + Mathf.CeilToInt(health[index]) + " HP");
+        var previous = GUI.color;
+        GUI.color = new Color(.09f, .12f, .17f);
+        GUI.Box(new Rect(x + 8f, y + 29f, width - 16f, 10f), GUIContent.none);
+        GUI.color = index == 0 ? new Color(.12f, .72f, 1f) : new Color(1f, .28f, .16f);
+        GUI.Box(new Rect(x + 8f, y + 29f, (width - 16f) * (health[index] / MaxHealth), 10f), GUIContent.none);
+        GUI.color = previous;
     }
 
     static int SpellIndex(string spell) {
