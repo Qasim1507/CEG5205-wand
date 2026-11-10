@@ -37,14 +37,19 @@ Mouse aiming/clicking remains available on desktop.
 The desktop game selects its mode from the connected Arduino count. Connect one
 Arduino for a match against the Wand Bot, or two for local PvP. In Unity Editor,
 open this scene in Play mode and run `python/play_wand.py` from the repository
-root. Each wand is recognized independently, and spells automatically travel
-to the opponent. The Wand Bot adjusts its response speed and accuracy as the
-health lead changes. Players start with 100 health; lightning deals the most
-damage. The first to reach zero loses, then a large victory sign and impact
-burst appear before the next round. The duel arena uses glowing runes, floating
-crystals, staffs, spell trails, and impact sparks. Physical room position is
-not tracked, so this mode does not use wand aiming or dodging. The packaged
-desktop launcher build steps are in the repository README. This mode does not
-run on the included Quest APK.
+root. Each wand is recognized independently, and spells travel toward the
+opponent when the aim ray hits. The duel scene has an expanded courtyard, glowing
+runes, floating crystals, spell trails, and impact sparks.
+
+For Quest PvP, build and install the updated APK on **two headsets**. Put both
+headsets and the laptop on the same Wi-Fi. Connect two Arduino wands to the
+laptop and run `python/play_wand.py --player1-port PORT1 --player2-port PORT2
+--unity-host PLAYER1_QUEST_IP` from the repository root. In Player 1's headset,
+press **A** on the right controller to host; Player 2 presses **X** on the left
+controller to join. Each headset renders one full-screen first-person view;
+head direction aims spells, the left stick moves, and each wand controls its
+player's casts. Player 1's Quest receives both Arduino streams from the laptop,
+then relays duel state and spell effects to Player 2 over the LAN. See the
+repository README for the complete command and APK build location.
 
 The scene uses an original generated floor texture, [Poly Haven Medieval Blocks 03](https://polyhaven.com/a/medieval_blocks_03) CC0 wall textures, and [Cinzel](https://github.com/google/fonts/tree/main/ofl/cinzel) under the SIL Open Font License. The font license is included in `Assets/WandSpells/Fonts/OFL.txt`.

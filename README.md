@@ -216,9 +216,44 @@ Player 2. Move the mouse into a player's screen half to aim for them; **Space**
 locks or releases the aim point. A recognized wand gesture casts the spell.
 Press **F2** to restart a round.
 
-The project includes Unity OpenXR and Meta OpenXR support. Quest's single-wand
-mode uses headset direction to aim, but local two-player split-screen is a
-desktop mode and is not supported in the headset.
+The project includes Unity OpenXR and Meta OpenXR support. Quest duel mode uses
+two headsets, one per player. Each player sees a full-screen first-person view,
+looks to aim, and uses the left controller stick to move. Both headsets show
+their own health as **YOU** and the other player's as **OPPONENT**.
+
+### Quest PvP with two headsets
+
+Build the updated APK from Unity (**Tools → Wand Spells → Build Quest APK**) and
+install that same build on both headsets. Put both Quests and the laptop on the
+same Wi-Fi. Start the game on each headset. Connect both Arduino wands to the
+laptop, then start the Python controller link, routing it to Player 1's Quest IP.
+Use the port names shown by your operating system:
+
+**macOS:**
+
+```bash
+.venv/bin/python python/play_wand.py --player1-port /dev/cu.usbmodem11101 --player2-port /dev/cu.usbmodem11102 --unity-host 192.168.1.20
+```
+
+**Windows (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py --player1-port COM3 --player2-port COM4 --unity-host 192.168.1.20
+```
+
+Replace the example ports and IP with your actual serial ports and Player 1's
+Wi-Fi IP. In Player 1's headset, press **A** on the right
+controller to host; in Player 2's headset, press **X** on the left controller to
+join. Each headset then has its own tracked POV. Head direction aims spells,
+left stick movement moves around the larger courtyard, and each wand's gesture
+casts its assigned player's spell. The laptop sends both wand streams to the
+host Quest; the headsets exchange movement, aim, health, and spell effects over
+UDP port **5060**. The laptop-to-Quest wand link uses UDP port **5055**.
+
+The Quest duel is a LAN prototype: it needs Wi-Fi that allows devices to talk
+to each other, and the headset build must be rebuilt after Unity code changes.
+The packaged APK may not contain the latest duel code. Local desktop PvP remains
+available separately through Unity Editor or the desktop launcher.
 
 ### Build a one-file desktop launcher
 
@@ -250,7 +285,9 @@ connected Arduino boards.
 Open [`unity/`](unity/) in Unity Hub with **6000.6.4f1**, then open
 `Assets/Scenes/WandSpellsMeetingDemo.unity`. Install **Android Build Support**,
 including SDK, NDK and OpenJDK, if building for Quest. Use
-**Tools → Wand Spells → Build Quest APK**, then rerun setup to install the new APK.
+**Tools → Wand Spells → Build Quest APK**. The APK is written to
+`unity/Builds/WandSpellsMeetingDemo.apk`; install it on each headset you want to
+use. Rerun setup to update a single USB-connected headset.
 See [Unity scene instructions](unity/WAND_SPELLS_MEETING.md) for desktop controls.
 
 ## Data collection and training reference

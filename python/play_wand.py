@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the desktop wand game with one or two connected Arduino controllers."""
+"""Run the wand game with one or two connected Arduino controllers."""
 from __future__ import annotations
 
 import argparse
@@ -106,7 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("Keep the connected wand(s) still for calibration."
           if getattr(sys, "frozen", False) else
           "Keep the connected wand(s) still for calibration and start the "
-          "Unity Editor scene before continuing.", flush=True)
+          "Unity Editor scene or Quest app before continuing.", flush=True)
 
     sources = [imu.make_source(False, port, on_message=lambda msg, n=i + 1:
                                print(f"P{n}: {msg}", flush=True))

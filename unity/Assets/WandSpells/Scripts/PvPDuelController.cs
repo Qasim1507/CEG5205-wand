@@ -38,7 +38,11 @@ public sealed class PvPDuelController : MonoBehaviour {
     bool roundOver;
     bool botOpponent;
     bool questRuntime;
-    bool questDuelUnsupported;
+    QuestDuelNetwork questNetwork;
+    int localPlayerId = 1;
+    readonly Vector3[] questHeadPositions = new Vector3[2];
+    readonly Quaternion[] questHeadRotations = { Quaternion.identity, Quaternion.identity };
+    float nextNetworkStateAt;
     bool aimLocked;
     int activeAimPlayer;
     int lockedAimPlayer;
@@ -72,9 +76,12 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void Update() {
+        EnsureQuestNetwork();
+        if (questRuntime && questNetwork != null && !started) HandleQuestPairingInput();
         if (started && Input.GetKeyDown(KeyCode.F2)) ResetRound();
         if (started) UpdateMouseAim();
         if (started && !roundOver) UpdatePlayerMovement();
+        if (started && questRuntime) SendQuestState();
         if (started && botOpponent && !roundOver && Time.time >= nextBotCastAt)
             BotAttack();
         if (centerRune != null) {
@@ -97,41 +104,108 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void OnModeRequested(string mode) {
         if (XRSettings.isDeviceActive && mode == "duel") {
-            questDuelUnsupported = true;
+            botOpponent = false;
             return;
         }
-        questDuelUnsupported = false;
         bool firstModePacket = !started;
         botOpponent = mode == "single";
         if (firstModePacket) nextBotCastAt = Time.time + Random.Range(2f, 3.5f);
         BeginDuel();
     }
 
-    void BeginDuel() {
+    void EnsureQuestNetwork() {
+        if (!XRSettings.isDeviceActive || questNetwork != null) return;
+        questRuntime = true;
+        questNetwork = GetComponent<QuestDuelNetwork>();
+        if (questNetwork == null) questNetwork = gameObject.AddComponent<QuestDuelNetwork>();
+        questNetwork.SessionReady += OnQuestSessionReady;
+        questNetwork.StateReceived += OnQuestStateReceived;
+        questNetwork.SpellReceived += OnQuestSpellReceived;
+    }
+
+    void HandleQuestPairingInput() {
+        if (questNetwork.IsActive) return;
+        var left = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+        var right = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+        bool joinPressed = false;
+        bool hostPressed = false;
+        left.TryGetFeatureValue(CommonUsages.primaryButton, out joinPressed);
+        right.TryGetFeatureValue(CommonUsages.primaryButton, out hostPressed);
+        if (hostPressed || Input.GetKeyDown(KeyCode.H)) questNetwork.StartHosting();
+        else if (joinPressed || Input.GetKeyDown(KeyCode.J)) questNetwork.JoinNearbyHost();
+    }
+
+    void OnQuestSessionReady(int playerId) {
+        localPlayerId = playerId;
+        botOpponent = false;
+        SetFeed(playerId == 1 ? "HOST READY  •  WAITING FOR PLAYER 2" : "CONNECTED TO PLAYER 1", new Color(.75f, .9f, 1f));
+        BeginDuel(playerId);
+    }
+
+    void OnQuestStateReceived(QuestDuelNetwork.Snapshot state) {
+        if (!started || !questRuntime || state == null) return;
+        int remoteIndex = 1 - (localPlayerId - 1);
+        playerRigs[remoteIndex].position = state.rigPosition;
+        playerRigs[remoteIndex].rotation = state.rigRotation;
+        questHeadPositions[remoteIndex] = state.headPosition;
+        questHeadRotations[remoteIndex] = state.headRotation;
+        if (questNetwork == null || !questNetwork.IsHost) {
+            health[0] = state.playerOneHealth;
+            health[1] = state.playerTwoHealth;
+            UpdateHealthUi();
+        }
+    }
+
+    void OnQuestSpellReceived(QuestDuelNetwork.SpellEvent spellEvent) {
+        if (!started || !questRuntime || spellEvent == null) return;
+        StartCoroutine(ShowNetworkSpell(spellEvent));
+    }
+
+    void BeginDuel(int requestedLocalPlayerId = 1) {
         if (started) return;
         questRuntime = XRSettings.isDeviceActive;
+        localPlayerId = requestedLocalPlayerId;
+        int localIndex = localPlayerId - 1;
+        Vector3[] spawns = { new Vector3(0f, 0f, -14f), new Vector3(0f, 0f, 14f) };
+        Quaternion[] spawnRotations = {
+            Quaternion.Euler(0f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f)
+        };
         var demo = FindObjectOfType<WandSpellDemoController>();
-        if (demo != null) demo.ActivateDesktopDuel();
+        if (demo != null) {
+            if (questRuntime) demo.ActivateDuelAt(spawns[localIndex], spawnRotations[localIndex]);
+            else demo.ActivateDesktopDuel();
+        }
         gameCamera = Camera.main;
         if (gameCamera == null) return;
         started = true;
-        playerRigs[0] = demo != null && demo.DesktopRig != null ? demo.DesktopRig : gameCamera.transform;
-        playerCameras[0] = gameCamera;
-        playerRigs[0].position = new Vector3(-2f, 0f, -3.25f);
-        playerRigs[0].rotation = Quaternion.Euler(0f, 90f, 0f);
-        cameraHomeRotation[0] = playerRigs[0].rotation;
-        gameCamera.rect = botOpponent || questRuntime
-            ? new Rect(0f, 0f, 1f, 1f) : new Rect(0f, 0f, .5f, 1f);
-        if (!questRuntime) gameCamera.fieldOfView = 72f;
-
-        var secondRig = new GameObject("Player 2 FPS camera rig").transform;
-        secondRig.position = new Vector3(2f, 0f, -3.25f);
-        secondRig.rotation = Quaternion.Euler(0f, -90f, 0f);
-        playerRigs[1] = secondRig;
-        cameraHomeRotation[1] = secondRig.rotation;
+        Transform sceneRig = demo != null && demo.DesktopRig != null ? demo.DesktopRig : gameCamera.transform;
+        if (questRuntime) {
+            playerRigs[localIndex] = sceneRig;
+            playerRigs[localIndex].position = spawns[localIndex];
+            playerRigs[localIndex].rotation = spawnRotations[localIndex];
+            int remoteIndex = 1 - localIndex;
+            playerRigs[remoteIndex] = new GameObject("Remote Quest player rig").transform;
+            playerRigs[remoteIndex].position = spawns[remoteIndex];
+            playerRigs[remoteIndex].rotation = spawnRotations[remoteIndex];
+            playerCameras[localIndex] = gameCamera;
+            playerCameras[remoteIndex] = null;
+            gameCamera.rect = new Rect(0f, 0f, 1f, 1f);
+        } else {
+            playerRigs[0] = sceneRig;
+            playerRigs[0].position = spawns[0];
+            playerRigs[0].rotation = spawnRotations[0];
+            playerCameras[0] = gameCamera;
+            playerRigs[1] = new GameObject("Player 2 FPS camera rig").transform;
+            playerRigs[1].position = spawns[1];
+            playerRigs[1].rotation = spawnRotations[1];
+            gameCamera.rect = botOpponent ? new Rect(0f, 0f, 1f, 1f) : new Rect(0f, 0f, .5f, 1f);
+            gameCamera.fieldOfView = 72f;
+        }
+        cameraHomeRotation[0] = spawnRotations[0];
+        cameraHomeRotation[1] = spawnRotations[1];
         if (!questRuntime) {
             var secondCameraObject = new GameObject("Player 2 camera");
-            secondCameraObject.transform.SetParent(secondRig, false);
+            secondCameraObject.transform.SetParent(playerRigs[1], false);
             secondCameraObject.transform.localPosition = new Vector3(0f, 1.65f, 0f);
             secondCameraObject.transform.localRotation = Quaternion.identity;
             playerCameras[1] = secondCameraObject.AddComponent<Camera>();
@@ -145,8 +219,16 @@ public sealed class PvPDuelController : MonoBehaviour {
             playerCameras[1].enabled = !botOpponent;
         } else playerCameras[1] = null;
 
-        CreateFpsDuelist(0, new Vector3(-2f, 0f, -3.25f), new Color(.18f, .70f, 1f));
-        CreateFpsDuelist(1, new Vector3(2f, 0f, -3.25f), new Color(1f, .32f, .20f));
+        CreateFpsDuelist(0, spawns[0], new Color(.18f, .70f, 1f));
+        CreateFpsDuelist(1, spawns[1], new Color(1f, .32f, .20f));
+        SetDuelWorldScale(2.25f);
+        SetPlayerLayer(playerBodies[0].gameObject, 30);
+        SetPlayerLayer(playerBodies[1].gameObject, 31);
+        if (questRuntime) gameCamera.cullingMask &= ~(1 << (localIndex == 0 ? 30 : 31));
+        else {
+            gameCamera.cullingMask &= ~(1 << 30);
+            if (playerCameras[1] != null) playerCameras[1].cullingMask &= ~(1 << 31);
+        }
         BuildArcaneDuelDecor();
         botHome = playerRigs[1];
         aimScreenPositions[0] = new Vector2(Screen.width * (botOpponent ? .5f : .25f), Screen.height * .5f);
@@ -154,6 +236,19 @@ public sealed class PvPDuelController : MonoBehaviour {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = !questRuntime;
         UpdateHealthUi();
+    }
+
+    void SetDuelWorldScale(float scale) {
+        string[] environmentNames = { "ARCANE SANCTUM - environment", "TRAINING SANCTUM - environment" };
+        foreach (string environmentName in environmentNames) {
+            var environment = GameObject.Find(environmentName);
+            if (environment != null) environment.transform.localScale = Vector3.one * scale;
+        }
+    }
+
+    void SetPlayerLayer(GameObject item, int layer) {
+        item.layer = layer;
+        foreach (Transform child in item.transform) SetPlayerLayer(child.gameObject, layer);
     }
 
     void UpdateMouseAim() {
@@ -187,7 +282,10 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     Ray GetAimRay(int playerIndex) {
         var aimCamera = playerCameras[playerIndex];
-        if (aimCamera == null) return new Ray(playerRigs[playerIndex].position, playerRigs[playerIndex].forward);
+        if (questRuntime && questNetwork != null && questNetwork.IsConnected &&
+            playerIndex != localPlayerId - 1)
+            return new Ray(questHeadPositions[playerIndex], questHeadRotations[playerIndex] * Vector3.forward);
+        if (aimCamera == null) return new Ray(playerRigs[playerIndex].position + Vector3.up, playerRigs[playerIndex].forward);
         if (questRuntime) return new Ray(aimCamera.transform.position, aimCamera.transform.forward);
         return aimCamera.ScreenPointToRay(aimScreenPositions[playerIndex]);
     }
@@ -278,71 +376,132 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void BuildArcaneDuelDecor() {
-        Vector3 center = new Vector3(0f, .035f, -3.25f);
-        var outer = MakeArcaneRing("Outer golden dueling seal", null, 3.45f, 3.55f,
+        Vector3 center = new Vector3(0f, .02f, 0f);
+        var ground = MakePrimitive("Open world basalt courtyard", PrimitiveType.Plane,
+            new Vector3(0f, -.16f, 0f), new Vector3(18f, 1f, 18f), new Color(.58f, .63f, .72f));
+        ground.GetComponent<Renderer>().material.mainTexture = CreatePavingTexture();
+        ground.GetComponent<Renderer>().material.mainTextureScale = new Vector2(45f, 45f);
+        MakePrimitive("Raised grand dueling terrace", PrimitiveType.Cylinder,
+            new Vector3(0f, -.12f, 0f), new Vector3(48f, .12f, 48f), new Color(.10f, .13f, .22f));
+
+        var outer = MakeArcaneRing("Outer golden dueling seal", null, 22.2f, 22.55f,
             new Color(.98f, .58f, .16f));
         outer.position = center;
-        var inner = MakeArcaneRing("Azure inner dueling seal", null, 2.25f, 2.31f,
+        var inner = MakeArcaneRing("Azure inner dueling seal", null, 14.8f, 15.05f,
             new Color(.15f, .69f, 1f));
         inner.position = center + Vector3.up * .01f;
-        var innerRed = MakeArcaneRing("Crimson inner dueling seal", null, 1.38f, 1.43f,
+        var innerRed = MakeArcaneRing("Crimson inner dueling seal", null, 7.8f, 8.02f,
             new Color(1f, .19f, .22f));
         innerRed.position = center + Vector3.up * .018f;
 
         for (int i = 0; i < 16; i++) {
             float angle = i * Mathf.PI * 2f / 16f;
             var rune = MakePrimitive("Floating arena glyph", PrimitiveType.Cube,
-                center + new Vector3(Mathf.Cos(angle) * 2.82f, .055f, Mathf.Sin(angle) * 2.82f),
-                new Vector3(.13f, .035f, .42f), i % 2 == 0 ? new Color(.2f, .72f, 1f) : new Color(1f, .54f, .17f), true);
+                center + new Vector3(Mathf.Cos(angle) * 18.4f, .055f, Mathf.Sin(angle) * 18.4f),
+                new Vector3(.38f, .05f, 1.4f), i % 2 == 0 ? new Color(.2f, .72f, 1f) : new Color(1f, .54f, .17f), true);
             rune.transform.rotation = Quaternion.Euler(0f, -angle * Mathf.Rad2Deg, 0f);
         }
 
         MakePrimitive("Arcane centerpiece plinth", PrimitiveType.Cylinder,
-            new Vector3(0f, 2.35f, -3.25f), new Vector3(1.0f, .18f, 1.0f),
+            new Vector3(0f, 5.7f, 0f), new Vector3(5.5f, .45f, 5.5f),
             new Color(.07f, .10f, .20f), true);
         var core = MakeAssetVisual("orb03_blue", "Floating arcane heart",
-            new Vector3(0f, 3.65f, -3.25f), Vector3.one * 1.65f,
-            PrimitiveType.Cylinder, new Vector3(.55f, 1.25f, .55f), new Color(.12f, .63f, 1f));
+            new Vector3(0f, 9f, 0f), Vector3.one * 3.2f,
+            PrimitiveType.Cylinder, new Vector3(1.5f, 3.4f, 1.5f), new Color(.12f, .63f, 1f));
         var coreLightObject = new GameObject("Arcane heart glow");
         coreLightObject.transform.position = core.transform.position;
         var coreLight = coreLightObject.AddComponent<Light>();
         coreLight.type = LightType.Point;
         coreLight.color = new Color(.18f, .56f, 1f);
-        coreLight.range = 11f;
-        coreLight.intensity = 3.2f;
+        coreLight.range = 24f;
+        coreLight.intensity = 4.2f;
         arenaLights.Add(coreLight);
         animatedAccents.Add(core.transform);
         accentSpinRates.Add(22f);
 
-        var halo = MakeArcaneRing("Floating crystal halo", null, 1.25f, 1.31f,
+        var halo = MakeArcaneRing("Floating crystal halo", null, 4.5f, 4.68f,
             new Color(.25f, .73f, 1f));
-        halo.position = new Vector3(0f, 3.65f, -3.25f);
+        halo.position = new Vector3(0f, 9f, 0f);
         halo.rotation = Quaternion.Euler(62f, 0f, 0f);
         animatedAccents.Add(halo);
         accentSpinRates.Add(-35f);
 
-        BuildArcanePillar(-6.3f, -6.6f, new Color(.12f, .64f, 1f));
-        BuildArcanePillar(6.3f, -6.6f, new Color(1f, .24f, .19f));
-        BuildArcanePillar(-6.3f, .1f, new Color(.55f, .25f, 1f));
-        BuildArcanePillar(6.3f, .1f, new Color(1f, .59f, .17f));
+        BuildArcanePillar(-38f, -38f, new Color(.12f, .64f, 1f));
+        BuildArcanePillar(38f, -38f, new Color(1f, .24f, .19f));
+        BuildArcanePillar(-38f, 38f, new Color(.55f, .25f, 1f));
+        BuildArcanePillar(38f, 38f, new Color(1f, .59f, .17f));
+        BuildArcanePillar(-48f, 0f, new Color(.18f, .55f, 1f));
+        BuildArcanePillar(48f, 0f, new Color(1f, .35f, .19f));
+        BuildArcanePillar(0f, -48f, new Color(.38f, .29f, 1f));
+        BuildArcanePillar(0f, 48f, new Color(1f, .65f, .22f));
+
+        for (int i = 0; i < 16; i++) {
+            float angle = i * Mathf.PI * 2f / 16f;
+            float radius = 76f + (i % 3) * 6f;
+            float height = 22f + (i % 4) * 6f;
+            var mountain = MakeCone("Distant arcane highland", null,
+                new Vector3(Mathf.Cos(angle) * radius, height * .5f - .2f, Mathf.Sin(angle) * radius),
+                12f + (i % 3) * 3f, height, i % 2 == 0
+                    ? new Color(.22f, .31f, .48f) : new Color(.32f, .30f, .51f));
+            mountain.transform.rotation = Quaternion.Euler(0f, angle * Mathf.Rad2Deg, 0f);
+        }
+
+        Color sky = new Color(.48f, .67f, .82f);
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = sky;
+        RenderSettings.fogStartDistance = 72f;
+        RenderSettings.fogEndDistance = 150f;
+        RenderSettings.ambientLight = new Color(.48f, .51f, .62f);
+        gameCamera.clearFlags = CameraClearFlags.SolidColor;
+        gameCamera.backgroundColor = sky;
+        if (playerCameras[1] != null) {
+            playerCameras[1].clearFlags = CameraClearFlags.SolidColor;
+            playerCameras[1].backgroundColor = sky;
+        }
+    }
+
+    Texture2D CreatePavingTexture() {
+        const int size = 128;
+        const int block = 32;
+        var texture = new Texture2D(size, size, TextureFormat.RGB24, false);
+        texture.wrapMode = TextureWrapMode.Repeat;
+        texture.filterMode = FilterMode.Bilinear;
+        var random = new System.Random(5205);
+        Color[] blocks = new Color[(size / block) * (size / block)];
+        for (int i = 0; i < blocks.Length; i++) {
+            float shade = .72f + (float)random.NextDouble() * .22f;
+            blocks[i] = new Color(shade, shade * 1.02f, shade * 1.12f);
+        }
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                int bx = x / block;
+                int by = y / block;
+                bool seam = x % block < 2 || y % block < 2;
+                float noise = .94f + (float)random.NextDouble() * .12f;
+                texture.SetPixel(x, y, seam ? new Color(.16f, .19f, .27f) : blocks[by * (size / block) + bx] * noise);
+            }
+        }
+        texture.Apply();
+        return texture;
     }
 
     void BuildArcanePillar(float x, float z, Color color) {
         MakePrimitive("Rune-carved arena pillar", PrimitiveType.Cylinder,
-            new Vector3(x, 1.4f, z), new Vector3(.42f, 1.4f, .42f),
+            new Vector3(x, 5f, z), new Vector3(.9f, 5f, .9f),
             new Color(.09f, .10f, .18f));
-        var trim = MakeArcaneRing("Pillar crown", null, .38f, .46f, color);
-        trim.position = new Vector3(x, 2.62f, z);
+        var trim = MakeArcaneRing("Pillar crown", null, .86f, 1.02f, color);
+        trim.position = new Vector3(x, 9.7f, z);
         var crystal = MakeAssetVisual("orb03_blue", "Pillar spell crystal",
-            new Vector3(x, 3.18f, z), Vector3.one * .48f,
-            PrimitiveType.Cube, Vector3.one * .48f, color);
+            new Vector3(x, 11.4f, z), Vector3.one * 1.15f,
+            PrimitiveType.Cube, Vector3.one * 1.15f, color);
         var lightObject = new GameObject("Arcane pillar light");
         lightObject.transform.position = crystal.transform.position;
         var light = lightObject.AddComponent<Light>();
         light.type = LightType.Point;
         light.color = color;
-        light.range = 5.2f;
-        light.intensity = 2.1f;
+        light.range = 13f;
+        light.intensity = 2.4f;
         arenaLights.Add(light);
         animatedAccents.Add(crystal.transform);
         accentSpinRates.Add(48f);
@@ -387,19 +546,63 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void UpdatePlayerMovement() {
-        MovePlayer(0, KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D);
-        if (!botOpponent) MovePlayer(1, KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.LeftArrow, KeyCode.RightArrow);
-        else if (botHome != null) {
-            float side = Mathf.Sin(Time.time * .75f) * 1.35f;
-            botHome.position = new Vector3(2f, 0f, -3.25f + side);
-            if (playerBodies[1] != null) playerBodies[1].position = botHome.position;
+        if (questRuntime) {
+            MoveQuestPlayer();
+            if (botOpponent && botHome != null)
+                botHome.position = new Vector3(Mathf.Sin(Time.time * .35f) * 6f, 0f, 14f);
+        } else {
+            MovePlayer(0, KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D);
+            if (!botOpponent) MovePlayer(1, KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.LeftArrow, KeyCode.RightArrow);
+            else if (botHome != null)
+                botHome.position = new Vector3(Mathf.Sin(Time.time * .35f) * 6f, 0f, 14f);
         }
         for (int i = 0; i < 2; i++) {
             if (playerBodies[i] != null && playerRigs[i] != null) {
-                playerBodies[i].position = playerRigs[i].position;
-                playerBodies[i].rotation = Quaternion.Euler(0f, playerRigs[i].eulerAngles.y, 0f);
+                if (questRuntime && playerCameras[i] != null) {
+                    playerBodies[i].position = playerCameras[i].transform.position - Vector3.up * 1.6f;
+                    playerBodies[i].rotation = playerCameras[i].transform.rotation * Quaternion.Euler(0f, 180f, 0f);
+                } else if (questRuntime && i != localPlayerId - 1 && questHeadPositions[i] != Vector3.zero) {
+                    playerBodies[i].position = questHeadPositions[i] - Vector3.up * 1.6f;
+                    playerBodies[i].rotation = questHeadRotations[i] * Quaternion.Euler(0f, 180f, 0f);
+                } else {
+                    playerBodies[i].position = playerRigs[i].position;
+                    playerBodies[i].rotation = playerRigs[i].rotation * Quaternion.Euler(0f, 180f, 0f);
+                }
             }
         }
+    }
+
+    void MoveQuestPlayer() {
+        int index = localPlayerId - 1;
+        var rig = playerRigs[index];
+        var view = playerCameras[index];
+        if (rig == null || view == null) return;
+        Vector2 stick = Vector2.zero;
+        InputDevices.GetDeviceAtXRNode(XRNode.LeftHand).TryGetFeatureValue(CommonUsages.primary2DAxis, out stick);
+        Vector3 forward = Vector3.ProjectOnPlane(view.transform.forward, Vector3.up).normalized;
+        Vector3 right = Vector3.ProjectOnPlane(view.transform.right, Vector3.up).normalized;
+        Vector3 move = forward * stick.y + right * stick.x;
+        if (move.sqrMagnitude > 1f) move.Normalize();
+        rig.position += move * (5f * Time.deltaTime);
+        rig.position = new Vector3(Mathf.Clamp(rig.position.x, -48f, 48f),
+            rig.position.y, Mathf.Clamp(rig.position.z, -48f, 48f));
+    }
+
+    void SendQuestState() {
+        if (questNetwork == null || !questNetwork.IsConnected || Time.unscaledTime < nextNetworkStateAt) return;
+        nextNetworkStateAt = Time.unscaledTime + .05f;
+        int index = localPlayerId - 1;
+        var rig = playerRigs[index];
+        var view = playerCameras[index];
+        if (rig == null || view == null) return;
+        questNetwork.SendState(new QuestDuelNetwork.Snapshot {
+            rigPosition = rig.position,
+            rigRotation = rig.rotation,
+            headPosition = view.transform.position,
+            headRotation = view.transform.rotation,
+            playerOneHealth = health[0],
+            playerTwoHealth = health[1]
+        });
     }
 
     void MovePlayer(int index, KeyCode forward, KeyCode backward, KeyCode left, KeyCode right) {
@@ -412,8 +615,8 @@ public sealed class PvPDuelController : MonoBehaviour {
         Vector3 move = (flatForward * forwardAxis + flatRight * sideAxis);
         if (move.sqrMagnitude > 1f) move.Normalize();
         Vector3 next = rig.position + move * (4.2f * Time.deltaTime);
-        next.x = Mathf.Clamp(next.x, -8f, 8f);
-        next.z = Mathf.Clamp(next.z, -10f, 2f);
+        next.x = Mathf.Clamp(next.x, -48f, 48f);
+        next.z = Mathf.Clamp(next.z, -48f, 48f);
         rig.position = next;
     }
 
@@ -596,6 +799,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         if (player < 1 || player > 2 || confidence < .55f) return;
         if (botOpponent && player != 1) return;
         if (!started) return;
+        if (questRuntime && questNetwork != null && questNetwork.IsActive && !questNetwork.IsHost) return;
         if (roundOver || Time.time - lastCast[player - 1] < Cooldown) return;
         int spellIndex = SpellIndex(spell);
         if (spellIndex < 0) return;
@@ -613,15 +817,20 @@ public sealed class PvPDuelController : MonoBehaviour {
         bool landed = false;
         Vector3 impact = playerBodies[1 - attacker] != null
             ? playerBodies[1 - attacker].position : Vector3.zero;
-        if (aimCamera != null) {
-            Ray ray = GetAimRay(attacker);
-            RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, 40f)) {
-                impact = hit.point;
-                landed = hit.transform == playerBodies[1 - attacker] ||
-                    (playerBodies[1 - attacker] != null && hit.transform.IsChildOf(playerBodies[1 - attacker]));
-            }
+        Ray ray = GetAimRay(attacker);
+        RaycastHit hit;
+        bool canAim = aimCamera != null || (questRuntime && questNetwork != null &&
+            questNetwork.IsHost && questNetwork.IsConnected);
+        if (canAim && Physics.Raycast(ray, out hit, 120f)) {
+            impact = hit.point;
+            landed = hit.transform == playerBodies[1 - attacker] ||
+                (playerBodies[1 - attacker] != null && hit.transform.IsChildOf(playerBodies[1 - attacker]));
         }
+        if (questRuntime && questNetwork != null && questNetwork.IsHost)
+            questNetwork.SendSpell(new QuestDuelNetwork.SpellEvent {
+                player = player, spell = spellIndex, origin = ray.origin,
+                target = landed ? impact : ray.GetPoint(18f), landed = landed
+            });
         StartCoroutine(SpellFlight(attacker, spellIndex, landed, impact));
     }
 
@@ -666,13 +875,15 @@ public sealed class PvPDuelController : MonoBehaviour {
         var color = SpellColor(spellIndex);
         var aimCamera = playerCameras[attacker];
         Ray aimRay = GetAimRay(attacker);
-        Vector3 origin = aimCamera != null
+        bool remoteQuestCaster = questRuntime && questNetwork != null && questNetwork.IsConnected &&
+            attacker != localPlayerId - 1;
+        Vector3 origin = aimCamera != null || remoteQuestCaster
             ? aimRay.origin + aimRay.direction * .45f
             : (wands[attacker] != null ? wands[attacker].position : Vector3.up);
         Vector3 defenderPosition = playerBodies[defender] != null
             ? playerBodies[defender].position : Vector3.zero;
         Vector3 target = impactPoint ?? defenderPosition;
-        if (!lands && aimCamera != null && target == defenderPosition)
+        if (!lands && (aimCamera != null || remoteQuestCaster) && target == defenderPosition)
             target = aimRay.origin + aimRay.direction * 18f;
         string[] orbNames = { "orb03_red", "orb03_blue", "orb03_green", "orb03_yellow" };
         var orb = MakeAssetVisual(orbNames[spellIndex], "PvP " + SpellName(spellIndex) + " spell",
@@ -709,6 +920,36 @@ public sealed class PvPDuelController : MonoBehaviour {
         Destroy(orb);
         ImpactBurst(target, color);
         if (lands) ApplyDamage(defender, spellIndex);
+    }
+
+    IEnumerator ShowNetworkSpell(QuestDuelNetwork.SpellEvent shot) {
+        if (shot.spell < 0 || shot.spell > 3) yield break;
+        var color = SpellColor(shot.spell);
+        string[] orbNames = { "orb03_red", "orb03_blue", "orb03_green", "orb03_yellow" };
+        var orb = MakeAssetVisual(orbNames[shot.spell], "Remote Quest spell",
+            shot.origin, Vector3.one * .58f, PrimitiveType.Sphere, Vector3.one * .45f, color);
+        var trail = orb.AddComponent<TrailRenderer>();
+        trail.time = .46f;
+        trail.startWidth = .42f;
+        trail.endWidth = .015f;
+        trail.startColor = color;
+        trail.endColor = new Color(color.r, color.g, color.b, 0f);
+        trail.material = new Material(Shader.Find("Sprites/Default"));
+        var glow = orb.AddComponent<Light>();
+        glow.type = LightType.Point;
+        glow.color = color;
+        glow.range = 3.8f;
+        glow.intensity = 2.8f;
+        float elapsed = 0f;
+        while (elapsed < .52f && orb != null) {
+            elapsed += Time.deltaTime;
+            orb.transform.position = Vector3.Lerp(shot.origin, shot.target, elapsed / .52f);
+            orb.transform.Rotate(Vector3.up, Time.deltaTime * 260f, Space.Self);
+            yield return null;
+        }
+        if (orb != null) Destroy(orb);
+        ImpactBurst(shot.target, color);
+        if (shot.landed) SetFeed("PLAYER " + shot.player + " HITS!", color);
     }
 
     void ApplyDamage(int defender, int spellIndex) {
@@ -848,19 +1089,23 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnGUI() {
-        if (questDuelUnsupported) {
+        if (questRuntime && !started) {
             DrawHudRect(new Rect(Screen.width * .18f, Screen.height * .35f,
-                Screen.width * .64f, Screen.height * .25f), new Color(.018f, .024f, .065f, .94f));
+                Screen.width * .64f, Screen.height * .30f), new Color(.018f, .024f, .065f, .94f));
             var warningStyle = new GUIStyle(GUI.skin.label) {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = Mathf.Clamp(Screen.height / 28, 18, 30),
+                fontSize = Mathf.Clamp(Screen.height / 36, 18, 32),
                 fontStyle = FontStyle.Bold,
                 wordWrap = true
             };
-            warningStyle.normal.textColor = new Color(1f, .82f, .35f);
+            warningStyle.normal.textColor = new Color(.88f, .94f, 1f);
+            string pairingStatus = questNetwork == null ? "Starting Quest link..." :
+                questNetwork.IsHost && !questNetwork.IsConnected ? "HOST READY  •  WAITING FOR PLAYER 2 TO JOIN" :
+                !questNetwork.IsHost && questNetwork.IsActive ? "SEARCHING FOR PLAYER 1 ON THIS WI-FI..." :
+                "PLAYER 1: PRESS A ON RIGHT CONTROLLER TO HOST\nPLAYER 2: PRESS X ON LEFT CONTROLLER TO JOIN";
             GUI.Label(new Rect(Screen.width * .20f, Screen.height * .37f,
-                Screen.width * .60f, Screen.height * .21f),
-                "LOCAL TWO-PLAYER SPLIT SCREEN IS DESKTOP ONLY\nUse one wand for Quest solo mode.", warningStyle);
+                Screen.width * .60f, Screen.height * .26f),
+                "QUEST WAND DUEL\n" + pairingStatus, warningStyle);
             return;
         }
         if (!started) return;
@@ -868,6 +1113,10 @@ public sealed class PvPDuelController : MonoBehaviour {
         if (botOpponent) {
             DrawHealthPanel(0, 18f, 202f, "YOU");
             DrawHealthPanel(1, Screen.width - 220f, 202f, "WAND BOT");
+        } else if (questRuntime) {
+            int localIndex = localPlayerId - 1;
+            DrawHealthPanel(localIndex, 18f, half - 36f, "YOU");
+            DrawHealthPanel(1 - localIndex, half + 18f, half - 36f, "OPPONENT");
         } else {
             DrawHealthPanel(0, 18f, half - 36f, "PLAYER 1");
             DrawHealthPanel(1, half + 18f, half - 36f, "PLAYER 2");
@@ -885,6 +1134,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         DrawHudRect(new Rect(Screen.width * .34f, 14f, 3f, 40f), new Color(.2f, .75f, 1f));
         GUI.Label(new Rect(Screen.width * .34f, 14f, Screen.width * .32f, 40f),
             botOpponent ? "ARCANE DUEL  <size=13>•  SOLO TRIAL</size>" :
+                questRuntime ? "ARCANE DUEL  <size=13>•  QUEST ONLINE</size>" :
                 "ARCANE DUEL  <size=13>•  LOCAL RIVALS</size>", titleStyle);
 
         var hintStyle = new GUIStyle(GUI.skin.label) {
@@ -933,7 +1183,9 @@ public sealed class PvPDuelController : MonoBehaviour {
             GUI.Label(new Rect(Screen.width * .22f, Screen.height * .36f,
                 Screen.width * .56f, Screen.height * .23f),
                 botOpponent ? (health[0] > 0 ? "YOU WIN!" : "BOT WINS") :
-                    (health[0] > 0 ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!"), resultStyle);
+                    questRuntime
+                        ? (health[localPlayerId - 1] > 0 ? "YOU WIN!" : "YOU LOSE")
+                        : (health[0] > 0 ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!"), resultStyle);
         }
     }
 

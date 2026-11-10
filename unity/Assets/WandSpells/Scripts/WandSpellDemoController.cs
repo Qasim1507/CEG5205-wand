@@ -116,12 +116,17 @@ public sealed class WandSpellDemoController : MonoBehaviour {
 
     /// <summary>Skip the wand-selection tutorial and keep its level as the desktop duel map.</summary>
     public void ActivateDesktopDuel() {
+        ActivateDuelAt(new Vector3(-2f, 0f, -3.25f), Quaternion.Euler(0f, 90f, 0f));
+    }
+
+    /// <summary>Enter duel play from a player-specific world spawn.</summary>
+    public void ActivateDuelAt(Vector3 spawnPosition, Quaternion spawnRotation) {
         desktopDuelActive = true;
         wandStyle = 0;
         arenaReady = true;
         if (sceneRig != null) {
-            sceneRig.position = new Vector3(-2f, 0f, -3.25f);
-            sceneRig.rotation = Quaternion.Euler(0f, 90f, 0f);
+            sceneRig.position = spawnPosition;
+            sceneRig.rotation = spawnRotation;
         }
         if (wandStyles != null)
             for (int i = 0; i < wandStyles.Length; i++)
