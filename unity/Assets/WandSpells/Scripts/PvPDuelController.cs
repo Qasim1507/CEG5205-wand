@@ -332,7 +332,7 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void OnPose(int player, Quaternion pose) {
         if (player < 1 || player > 2) return;
-        if (!started) BeginDuel();
+        if (!started) return; // Wait for the launcher mode packet so solo doesn't briefly start as PvP.
         var index = player - 1;
         if (!poseCalibrated[index]) {
             poseNeutral[index] = pose;
@@ -348,7 +348,7 @@ public sealed class PvPDuelController : MonoBehaviour {
     void OnCast(int player, string spell, float confidence) {
         if (player < 1 || player > 2 || confidence < .55f) return;
         if (botOpponent && player != 1) return;
-        if (!started) BeginDuel();
+        if (!started) return;
         if (roundOver || Time.time - lastCast[player - 1] < Cooldown) return;
         int spellIndex = SpellIndex(spell);
         if (spellIndex < 0) return;
