@@ -24,6 +24,8 @@ public sealed class PvPDuelController : MonoBehaviour {
     readonly List<Transform> floatingCrystals = new List<Transform>();
     readonly List<Vector3> floatingCrystalHomes = new List<Vector3>();
     readonly List<Light> arenaLights = new List<Light>();
+    readonly List<Transform> animatedAccents = new List<Transform>();
+    readonly List<float> accentSpinRates = new List<float>();
     TextMesh[] healthLabels = new TextMesh[2];
     TextMesh banner;
     TextMesh victoryText;
@@ -38,6 +40,9 @@ public sealed class PvPDuelController : MonoBehaviour {
     int lastBotSpell = -1;
     float lastHumanCastAt = -10f;
     Transform botHome;
+    string feedText = "";
+    float feedUntil;
+    Color feedColor = Color.white;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Install() {
@@ -74,6 +79,10 @@ public sealed class PvPDuelController : MonoBehaviour {
         }
         for (int i = 0; i < arenaLights.Count; i++)
             arenaLights[i].intensity = 1.6f + .45f * Mathf.Sin(Time.time * 2.4f + i * 1.7f);
+        for (int i = 0; i < animatedAccents.Count; i++) {
+            if (animatedAccents[i] != null)
+                animatedAccents[i].Rotate(Vector3.up, Time.deltaTime * accentSpinRates[i], Space.World);
+        }
     }
 
     void OnModeRequested(string mode) {
@@ -119,24 +128,203 @@ public sealed class PvPDuelController : MonoBehaviour {
 
         CreateFpsDuelist(0, new Vector3(-2f, 0f, -3.25f), new Color(.18f, .70f, 1f));
         CreateFpsDuelist(1, new Vector3(2f, 0f, -3.25f), new Color(1f, .32f, .20f));
+        BuildArcaneDuelDecor();
         botHome = playerRigs[1];
         UpdateHealthUi();
     }
 
     void CreateFpsDuelist(int index, Vector3 position, Color color) {
-        var body = MakePrimitive(index == 0 ? "Blue duelist" : "Red duelist",
-            PrimitiveType.Capsule, position + Vector3.up * .95f,
-            new Vector3(.75f, .95f, .75f), color, true);
+        var body = new GameObject(index == 0 ? "Azure spellblade" : "Crimson spellblade");
+        body.transform.position = position;
         var hitbox = body.AddComponent<CapsuleCollider>();
         hitbox.height = 1.9f;
         hitbox.radius = .38f;
-        hitbox.center = Vector3.zero;
+        hitbox.center = Vector3.up * .95f;
         playerBodies[index] = body.transform;
+
+        Color deep = Color.Lerp(color, new Color(.035f, .045f, .10f), .55f);
+        Color trim = index == 0 ? new Color(.18f, .85f, 1f) : new Color(1f, .39f, .14f);
+        CreateDuelistPart(body.transform, "Layered battle robe", PrimitiveType.Cylinder,
+            new Vector3(0f, .72f, 0f), new Vector3(.63f, .72f, .58f), deep, false);
+        CreateDuelistPart(body.transform, "Robe mantle", PrimitiveType.Sphere,
+            new Vector3(0f, 1.15f, 0f), new Vector3(.57f, .50f, .49f), color, false);
+        CreateDuelistPart(body.transform, "Gilded chest plate", PrimitiveType.Cube,
+            new Vector3(0f, 1.24f, -.39f), new Vector3(.48f, .52f, .09f), trim, true);
+        CreateDuelistPart(body.transform, "Hood", PrimitiveType.Sphere,
+            new Vector3(0f, 1.76f, .05f), new Vector3(.48f, .51f, .46f), deep, false);
+        CreateDuelistPart(body.transform, "Face", PrimitiveType.Sphere,
+            new Vector3(0f, 1.71f, -.29f), new Vector3(.31f, .35f, .19f),
+            new Color(.91f, .75f, .58f), false);
+        CreateDuelistPart(body.transform, "Wizard cap", PrimitiveType.Cylinder,
+            new Vector3(0f, 2.05f, .03f), new Vector3(.44f, .10f, .44f), trim, true);
+        MakeCone("Pointed wizard hood", body.transform, new Vector3(0f, 2.42f, .04f),
+            .34f, .75f, deep);
+        CreateDuelistPart(body.transform, "Left sleeve", PrimitiveType.Capsule,
+            new Vector3(-.47f, 1.12f, -.02f), new Vector3(.22f, .46f, .22f), color, false).transform.localRotation = Quaternion.Euler(0f, 0f, -28f);
+        CreateDuelistPart(body.transform, "Right sleeve", PrimitiveType.Capsule,
+            new Vector3(.47f, 1.12f, -.02f), new Vector3(.22f, .46f, .22f), color, false).transform.localRotation = Quaternion.Euler(0f, 0f, 28f);
+        CreateDuelistPart(body.transform, "Left eye", PrimitiveType.Sphere,
+            new Vector3(-.11f, 1.73f, -.45f), new Vector3(.045f, .05f, .035f), trim, true);
+        CreateDuelistPart(body.transform, "Right eye", PrimitiveType.Sphere,
+            new Vector3(.11f, 1.73f, -.45f), new Vector3(.045f, .05f, .035f), trim, true);
+        var waist = MakeArcaneRing("Waist rune trim", body.transform, .42f, .48f, trim);
+        waist.localPosition = new Vector3(0f, .65f, 0f);
+        waist.localScale = new Vector3(1f, .75f, 1f);
+
         string asset = index == 0 ? "wand01_blue" : "wand01_red";
         var wand = MakeAssetVisual(asset, "Player " + (index + 1) + " wand visual",
             position + new Vector3(index == 0 ? .38f : -.38f, 1.15f, .1f),
-            Vector3.one * .65f, PrimitiveType.Cylinder, new Vector3(.10f, .55f, .10f), color);
+            Vector3.one * .65f, PrimitiveType.Cylinder, new Vector3(.10f, .55f, .10f), trim);
+        wand.transform.SetParent(body.transform, true);
+        AlignAssetLength(wand, Vector3.up, 1.1f);
         wands[index] = wand.transform;
+    }
+
+    GameObject CreateDuelistPart(Transform parent, string name, PrimitiveType shape,
+                                 Vector3 localPosition, Vector3 localScale, Color color, bool emissive) {
+        var part = MakePrimitive(name, shape, parent.TransformPoint(localPosition), localScale, color, emissive);
+        part.transform.SetParent(parent, false);
+        part.transform.localPosition = localPosition;
+        part.transform.localScale = localScale;
+        return part;
+    }
+
+    GameObject MakeCone(string name, Transform parent, Vector3 localPosition, float radius,
+                        float height, Color color) {
+        const int sides = 12;
+        var vertices = new Vector3[sides + 2];
+        vertices[0] = new Vector3(0f, -height * .5f, 0f);
+        for (int i = 0; i < sides; i++) {
+            float angle = i * Mathf.PI * 2f / sides;
+            vertices[i + 1] = new Vector3(Mathf.Cos(angle) * radius, -height * .5f,
+                Mathf.Sin(angle) * radius);
+        }
+        vertices[sides + 1] = new Vector3(0f, height * .5f, 0f);
+        var triangles = new List<int>();
+        for (int i = 0; i < sides; i++) {
+            int next = (i + 1) % sides;
+            triangles.Add(0); triangles.Add(i + 1); triangles.Add(next + 1);
+            triangles.Add(i + 1); triangles.Add(sides + 1); triangles.Add(next + 1);
+        }
+        var mesh = new Mesh { name = name + " mesh", vertices = vertices, triangles = triangles.ToArray() };
+        mesh.RecalculateNormals();
+        var cone = new GameObject(name);
+        cone.transform.SetParent(parent, false);
+        cone.transform.localPosition = localPosition;
+        var filter = cone.AddComponent<MeshFilter>();
+        filter.sharedMesh = mesh;
+        var renderer = cone.AddComponent<MeshRenderer>();
+        renderer.material = CreateArcaneMaterial(color, false);
+        return cone;
+    }
+
+    void BuildArcaneDuelDecor() {
+        Vector3 center = new Vector3(0f, .035f, -3.25f);
+        var outer = MakeArcaneRing("Outer golden dueling seal", null, 3.45f, 3.55f,
+            new Color(.98f, .58f, .16f));
+        outer.position = center;
+        var inner = MakeArcaneRing("Azure inner dueling seal", null, 2.25f, 2.31f,
+            new Color(.15f, .69f, 1f));
+        inner.position = center + Vector3.up * .01f;
+        var innerRed = MakeArcaneRing("Crimson inner dueling seal", null, 1.38f, 1.43f,
+            new Color(1f, .19f, .22f));
+        innerRed.position = center + Vector3.up * .018f;
+
+        for (int i = 0; i < 16; i++) {
+            float angle = i * Mathf.PI * 2f / 16f;
+            var rune = MakePrimitive("Floating arena glyph", PrimitiveType.Cube,
+                center + new Vector3(Mathf.Cos(angle) * 2.82f, .055f, Mathf.Sin(angle) * 2.82f),
+                new Vector3(.13f, .035f, .42f), i % 2 == 0 ? new Color(.2f, .72f, 1f) : new Color(1f, .54f, .17f), true);
+            rune.transform.rotation = Quaternion.Euler(0f, -angle * Mathf.Rad2Deg, 0f);
+        }
+
+        MakePrimitive("Arcane centerpiece plinth", PrimitiveType.Cylinder,
+            new Vector3(0f, 2.35f, -3.25f), new Vector3(1.0f, .18f, 1.0f),
+            new Color(.07f, .10f, .20f), true);
+        var core = MakeAssetVisual("orb03_blue", "Floating arcane heart",
+            new Vector3(0f, 3.65f, -3.25f), Vector3.one * 1.65f,
+            PrimitiveType.Cylinder, new Vector3(.55f, 1.25f, .55f), new Color(.12f, .63f, 1f));
+        var coreLightObject = new GameObject("Arcane heart glow");
+        coreLightObject.transform.position = core.transform.position;
+        var coreLight = coreLightObject.AddComponent<Light>();
+        coreLight.type = LightType.Point;
+        coreLight.color = new Color(.18f, .56f, 1f);
+        coreLight.range = 11f;
+        coreLight.intensity = 3.2f;
+        arenaLights.Add(coreLight);
+        animatedAccents.Add(core.transform);
+        accentSpinRates.Add(22f);
+
+        var halo = MakeArcaneRing("Floating crystal halo", null, 1.25f, 1.31f,
+            new Color(.25f, .73f, 1f));
+        halo.position = new Vector3(0f, 3.65f, -3.25f);
+        halo.rotation = Quaternion.Euler(62f, 0f, 0f);
+        animatedAccents.Add(halo);
+        accentSpinRates.Add(-35f);
+
+        BuildArcanePillar(-6.3f, -6.6f, new Color(.12f, .64f, 1f));
+        BuildArcanePillar(6.3f, -6.6f, new Color(1f, .24f, .19f));
+        BuildArcanePillar(-6.3f, .1f, new Color(.55f, .25f, 1f));
+        BuildArcanePillar(6.3f, .1f, new Color(1f, .59f, .17f));
+    }
+
+    void BuildArcanePillar(float x, float z, Color color) {
+        MakePrimitive("Rune-carved arena pillar", PrimitiveType.Cylinder,
+            new Vector3(x, 1.4f, z), new Vector3(.42f, 1.4f, .42f),
+            new Color(.09f, .10f, .18f));
+        var trim = MakeArcaneRing("Pillar crown", null, .38f, .46f, color);
+        trim.position = new Vector3(x, 2.62f, z);
+        var crystal = MakeAssetVisual("orb03_blue", "Pillar spell crystal",
+            new Vector3(x, 3.18f, z), Vector3.one * .48f,
+            PrimitiveType.Cube, Vector3.one * .48f, color);
+        var lightObject = new GameObject("Arcane pillar light");
+        lightObject.transform.position = crystal.transform.position;
+        var light = lightObject.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.color = color;
+        light.range = 5.2f;
+        light.intensity = 2.1f;
+        arenaLights.Add(light);
+        animatedAccents.Add(crystal.transform);
+        accentSpinRates.Add(48f);
+    }
+
+    Transform MakeArcaneRing(string name, Transform parent, float innerRadius,
+                             float outerRadius, Color color) {
+        const int segments = 72;
+        var vertices = new Vector3[(segments + 1) * 2];
+        var triangles = new int[segments * 6];
+        for (int i = 0; i <= segments; i++) {
+            float angle = i * Mathf.PI * 2f / segments;
+            Vector3 direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+            vertices[i * 2] = direction * innerRadius;
+            vertices[i * 2 + 1] = direction * outerRadius;
+            if (i == segments) continue;
+            int v = i * 2;
+            int t = i * 6;
+            triangles[t] = v; triangles[t + 1] = v + 2; triangles[t + 2] = v + 1;
+            triangles[t + 3] = v + 1; triangles[t + 4] = v + 2; triangles[t + 5] = v + 3;
+        }
+        var mesh = new Mesh { name = name + " mesh", vertices = vertices, triangles = triangles };
+        mesh.RecalculateNormals();
+        var ring = new GameObject(name).transform;
+        if (parent != null) ring.SetParent(parent, false);
+        var filter = ring.gameObject.AddComponent<MeshFilter>();
+        filter.sharedMesh = mesh;
+        var renderer = ring.gameObject.AddComponent<MeshRenderer>();
+        renderer.material = CreateArcaneMaterial(color, true);
+        return ring;
+    }
+
+    Material CreateArcaneMaterial(Color color, bool emission) {
+        var material = new Material(Shader.Find("Standard"));
+        material.color = color;
+        material.SetFloat("_Glossiness", .78f);
+        if (emission) {
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", color * 2.2f);
+        }
+        return material;
     }
 
     void UpdatePlayerMovement() {
@@ -145,11 +333,11 @@ public sealed class PvPDuelController : MonoBehaviour {
         else if (botHome != null) {
             float side = Mathf.Sin(Time.time * .75f) * 1.35f;
             botHome.position = new Vector3(2f, 0f, -3.25f + side);
-            if (playerBodies[1] != null) playerBodies[1].position = botHome.position + Vector3.up * .95f;
+            if (playerBodies[1] != null) playerBodies[1].position = botHome.position;
         }
         for (int i = 0; i < 2; i++) {
             if (playerBodies[i] != null && playerRigs[i] != null) {
-                playerBodies[i].position = playerRigs[i].position + Vector3.up * .95f;
+                playerBodies[i].position = playerRigs[i].position;
                 playerBodies[i].rotation = Quaternion.Euler(0f, playerRigs[i].eulerAngles.y, 0f);
             }
         }
@@ -352,6 +540,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         if (roundOver || Time.time - lastCast[player - 1] < Cooldown) return;
         int spellIndex = SpellIndex(spell);
         if (spellIndex < 0) return;
+        SetFeed("PLAYER " + player + " CASTS " + SpellName(spellIndex), SpellColor(spellIndex));
         lastCast[player - 1] = Time.time;
         if (botOpponent && player == 1) {
             lastHumanSpell = spellIndex;
@@ -385,14 +574,16 @@ public sealed class PvPDuelController : MonoBehaviour {
         float hitChance = Mathf.Lerp(.68f, .94f, pressure);
         bool lands = Random.value < hitChance;
         if (!lands) {
+            SetFeed("THE BOT MISSED!", new Color(.72f, .84f, 1f));
             if (banner != null) banner.text = "WAND BOT MISSED!";
             StartCoroutine(RestoreBannerAfter(.9f));
             return;
         }
         lastBotSpell = spellIndex;
+        SetFeed("THE BOT CASTS " + SpellName(spellIndex), SpellColor(spellIndex));
         if (banner != null) banner.text = "WAND BOT CASTS " + SpellName(spellIndex);
         StartCoroutine(SpellFlight(1, spellIndex, lands,
-            playerBodies[0] != null ? playerBodies[0].position : Vector3.zero));
+            playerBodies[0] != null ? playerBodies[0].position + Vector3.up : Vector3.zero));
     }
 
     float BotPressure() {
@@ -426,9 +617,19 @@ public sealed class PvPDuelController : MonoBehaviour {
         string[] orbNames = { "orb03_red", "orb03_blue", "orb03_green", "orb03_yellow" };
         var orb = MakeAssetVisual(orbNames[spellIndex], "PvP " + SpellName(spellIndex) + " spell",
             origin, Vector3.one * .58f, PrimitiveType.Sphere, Vector3.one * .45f, color);
+        for (int i = 0; i < 3; i++) {
+            float angle = i * Mathf.PI * 2f / 3f;
+            var spark = MakePrimitive("Orbiting spell mote", PrimitiveType.Sphere,
+                origin, Vector3.one * .16f, color, true);
+            spark.transform.SetParent(orb.transform, false);
+            spark.transform.localPosition = new Vector3(Mathf.Cos(angle) * .52f,
+                Mathf.Sin(angle * 2f) * .22f, Mathf.Sin(angle) * .52f);
+        }
+        var halo = MakeArcaneRing("Spell halo", orb.transform, .48f, .53f, color);
+        halo.localRotation = Quaternion.Euler(75f, 0f, 0f);
         var trail = orb.AddComponent<TrailRenderer>();
-        trail.time = .32f;
-        trail.startWidth = .30f;
+        trail.time = .46f;
+        trail.startWidth = .42f;
         trail.endWidth = .015f;
         trail.startColor = color;
         trail.endColor = new Color(color.r, color.g, color.b, 0f);
@@ -436,11 +637,12 @@ public sealed class PvPDuelController : MonoBehaviour {
         var glow = orb.AddComponent<Light>();
         glow.type = LightType.Point;
         glow.color = color;
-        glow.range = 2.6f;
-        glow.intensity = 1.8f;
-        float duration = .45f;
+        glow.range = 3.8f;
+        glow.intensity = 2.8f;
+        float duration = .52f;
         for (float elapsed = 0f; elapsed < duration; elapsed += Time.deltaTime) {
             orb.transform.position = Vector3.Lerp(origin, target, elapsed / duration);
+            orb.transform.Rotate(Vector3.up, Time.deltaTime * 260f, Space.Self);
             yield return null;
         }
         orb.transform.position = target;
@@ -459,6 +661,9 @@ public sealed class PvPDuelController : MonoBehaviour {
                 : "PLAYER " + (2 - defender) + " HIT!";
             StartCoroutine(RestoreBannerAfter(.9f));
         }
+        SetFeed(botOpponent
+            ? (defender == 1 ? "DIRECT HIT!" : "YOU WERE HIT!")
+            : "PLAYER " + (2 - defender) + " TAKES A HIT", SpellColor(spellIndex));
         if (health[defender] <= 0f) {
             roundOver = true;
             string result = botOpponent
@@ -468,8 +673,9 @@ public sealed class PvPDuelController : MonoBehaviour {
             if (victoryText != null) victoryText.text = result;
             if (victoryPanel != null) victoryPanel.SetActive(true);
             if (victoryText != null) victoryText.gameObject.SetActive(true);
-            Vector3 winnerPosition = defender == 1 ? new Vector3(-4f, 1.6f, 0f) :
-                new Vector3(4f, 1.6f, 0f);
+            Vector3 winnerPosition = playerRigs[1 - defender] != null
+                ? playerRigs[1 - defender].position + Vector3.up * 1.5f
+                : Vector3.up * 1.5f;
             ImpactBurst(winnerPosition, new Color(1f, .78f, .18f));
             StartCoroutine(ResetAfterRound());
         }
@@ -504,13 +710,51 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void ImpactBurst(Vector3 position, Color color) {
-        for (int i = 0; i < 10; i++) {
-            Vector3 offset = Random.insideUnitSphere * .28f;
+        var shockwave = MakeArcaneRing("Spell impact shockwave", null, .24f, .32f, color);
+        shockwave.position = position;
+        StartCoroutine(ExpandImpactRing(shockwave));
+        var flashObject = new GameObject("Spell impact flash");
+        flashObject.transform.position = position;
+        var flash = flashObject.AddComponent<Light>();
+        flash.type = LightType.Point;
+        flash.color = color;
+        flash.range = 5.5f;
+        flash.intensity = 5f;
+        StartCoroutine(FadeImpactLight(flashObject, flash));
+        for (int i = 0; i < 20; i++) {
+            Vector3 offset = Random.insideUnitSphere * .42f;
             var spark = MakePrimitive("Spell impact spark", PrimitiveType.Sphere,
-                position + offset, Vector3.one * Random.Range(.08f, .16f), color, true);
+                position + offset, Vector3.one * Random.Range(.09f, .20f), color, true);
             StartCoroutine(ShrinkSpark(spark.transform,
-                offset.normalized * Random.Range(.4f, .95f)));
+                offset.normalized * Random.Range(.7f, 1.45f)));
         }
+    }
+
+    IEnumerator ExpandImpactRing(Transform ring) {
+        float elapsed = 0f;
+        while (elapsed < .55f && ring != null) {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / .55f);
+            ring.localScale = Vector3.one * Mathf.Lerp(.3f, 4.6f, t);
+            yield return null;
+        }
+        if (ring != null) Destroy(ring.gameObject);
+    }
+
+    IEnumerator FadeImpactLight(GameObject lightObject, Light light) {
+        float elapsed = 0f;
+        while (elapsed < .32f && light != null) {
+            elapsed += Time.deltaTime;
+            light.intensity = Mathf.Lerp(5f, 0f, elapsed / .32f);
+            yield return null;
+        }
+        if (lightObject != null) Destroy(lightObject);
+    }
+
+    void SetFeed(string message, Color color) {
+        feedText = message;
+        feedUntil = Time.time + 1.15f;
+        feedColor = color;
     }
 
     IEnumerator ShrinkSpark(Transform spark, Vector3 travel) {
@@ -555,47 +799,100 @@ public sealed class PvPDuelController : MonoBehaviour {
         }
 
         var titleStyle = new GUIStyle(GUI.skin.label) {
-            alignment = TextAnchor.UpperCenter,
-            fontSize = Mathf.Clamp(Screen.height / 28, 18, 30),
-            fontStyle = FontStyle.Bold
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = Mathf.Clamp(Screen.height / 35, 16, 26),
+            fontStyle = FontStyle.Bold,
+            richText = true
         };
-        titleStyle.normal.textColor = Color.white;
-        GUI.Label(new Rect(0f, 18f, Screen.width, 42f),
-            botOpponent ? "WAND DUEL  ·  YOU VS BOT" : "WAND DUEL  ·  LOCAL PVP", titleStyle);
+        titleStyle.normal.textColor = new Color(.9f, .96f, 1f);
+        DrawHudRect(new Rect(Screen.width * .34f, 14f, Screen.width * .32f, 40f),
+            new Color(.025f, .035f, .09f, .88f));
+        DrawHudRect(new Rect(Screen.width * .34f, 14f, 3f, 40f), new Color(.2f, .75f, 1f));
+        GUI.Label(new Rect(Screen.width * .34f, 14f, Screen.width * .32f, 40f),
+            botOpponent ? "ARCANE DUEL  <size=13>•  SOLO TRIAL</size>" :
+                "ARCANE DUEL  <size=13>•  LOCAL RIVALS</size>", titleStyle);
 
         var hintStyle = new GUIStyle(GUI.skin.label) {
-            alignment = TextAnchor.LowerCenter,
-            fontSize = Mathf.Clamp(Screen.height / 58, 12, 18)
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = Mathf.Clamp(Screen.height / 68, 11, 16),
+            fontStyle = FontStyle.Bold
         };
-        hintStyle.normal.textColor = new Color(.82f, .9f, 1f);
-        GUI.Label(new Rect(0f, Screen.height - 36f, Screen.width, 28f),
-            botOpponent ? "WASD to move  ·  Aim with your wand  ·  F2 restarts" :
-                "P1: WASD  ·  P2: Arrow keys  ·  Aim with each wand  ·  F2 restarts", hintStyle);
-        if (!botOpponent) GUI.Box(new Rect(half - 1f, 0f, 2f, Screen.height), GUIContent.none);
+        hintStyle.normal.textColor = new Color(.78f, .88f, 1f);
+        DrawHudRect(new Rect(Screen.width * .15f, Screen.height - 43f,
+            Screen.width * .70f, 30f), new Color(.025f, .035f, .09f, .82f));
+        GUI.Label(new Rect(Screen.width * .15f, Screen.height - 43f,
+            Screen.width * .70f, 30f), botOpponent
+                ? "WASD  MOVE     •     WAND  AIM + CAST     •     F2  NEW ROUND"
+                : "P1  WASD  MOVE     •     P2  ARROWS  MOVE     •     WANDS  AIM + CAST", hintStyle);
+        if (!botOpponent) {
+            DrawHudRect(new Rect(half - 1f, 0f, 2f, Screen.height), new Color(.48f, .72f, 1f, .75f));
+            DrawReticle(Screen.width * .25f, new Color(.2f, .82f, 1f));
+            DrawReticle(Screen.width * .75f, new Color(1f, .38f, .23f));
+        } else DrawReticle(Screen.width * .5f, new Color(.58f, .86f, 1f));
+
+        if (Time.time < feedUntil && !string.IsNullOrEmpty(feedText)) {
+            var feedStyle = new GUIStyle(titleStyle) { fontSize = Mathf.Clamp(Screen.height / 25, 20, 34) };
+            feedStyle.normal.textColor = feedColor;
+            GUI.Label(new Rect(Screen.width * .2f, Screen.height * .20f,
+                Screen.width * .6f, 45f), feedText, feedStyle);
+        }
 
         if (roundOver) {
-            var resultStyle = new GUIStyle(GUI.skin.box) {
+            DrawHudRect(new Rect(Screen.width * .22f, Screen.height * .34f,
+                Screen.width * .56f, Screen.height * .27f), new Color(.018f, .024f, .065f, .94f));
+            DrawHudRect(new Rect(Screen.width * .22f, Screen.height * .34f, 5f,
+                Screen.height * .27f), new Color(1f, .68f, .18f));
+            var resultStyle = new GUIStyle(GUI.skin.label) {
                 alignment = TextAnchor.MiddleCenter,
                 fontSize = Mathf.Clamp(Screen.height / 12, 30, 64),
-                fontStyle = FontStyle.Bold
+                fontStyle = FontStyle.Bold,
+                richText = true
             };
             resultStyle.normal.textColor = new Color(1f, .83f, .2f);
-            GUI.Box(new Rect(Screen.width * .2f, Screen.height * .37f,
-                Screen.width * .6f, Screen.height * .22f),
+            GUI.Label(new Rect(Screen.width * .22f, Screen.height * .36f,
+                Screen.width * .56f, Screen.height * .23f),
                 botOpponent ? (health[0] > 0 ? "YOU WIN!" : "BOT WINS") :
                     (health[0] > 0 ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!"), resultStyle);
         }
     }
 
     void DrawHealthPanel(int index, float x, float width, string label) {
-        float y = 64f;
-        GUI.Box(new Rect(x, y, width, 48f), label + "   " + Mathf.CeilToInt(health[index]) + " HP");
-        var previous = GUI.color;
-        GUI.color = new Color(.09f, .12f, .17f);
-        GUI.Box(new Rect(x + 8f, y + 29f, width - 16f, 10f), GUIContent.none);
-        GUI.color = index == 0 ? new Color(.12f, .72f, 1f) : new Color(1f, .28f, .16f);
-        GUI.Box(new Rect(x + 8f, y + 29f, (width - 16f) * (health[index] / MaxHealth), 10f), GUIContent.none);
+        float y = 68f;
+        Color accent = index == 0 ? new Color(.12f, .72f, 1f) : new Color(1f, .28f, .16f);
+        DrawHudRect(new Rect(x, y, width, 55f), new Color(.018f, .026f, .065f, .88f));
+        DrawHudRect(new Rect(x, y, 3f, 55f), accent);
+        var nameStyle = new GUIStyle(GUI.skin.label) {
+            alignment = TextAnchor.MiddleLeft,
+            fontSize = Mathf.Clamp(Screen.height / 62, 12, 18),
+            fontStyle = FontStyle.Bold
+        };
+        nameStyle.normal.textColor = new Color(.85f, .91f, 1f);
+        GUI.Label(new Rect(x + 11f, y + 3f, width * .65f, 22f), label, nameStyle);
+        var hpStyle = new GUIStyle(nameStyle) {
+            alignment = TextAnchor.MiddleRight,
+            fontSize = Mathf.Clamp(Screen.height / 70, 11, 16)
+        };
+        hpStyle.normal.textColor = accent;
+        GUI.Label(new Rect(x + width * .65f, y + 3f, width * .30f, 22f),
+            Mathf.CeilToInt(health[index]) + "  HP", hpStyle);
+        DrawHudRect(new Rect(x + 11f, y + 34f, width - 22f, 9f), new Color(.08f, .10f, .17f));
+        DrawHudRect(new Rect(x + 11f, y + 34f, (width - 22f) * (health[index] / MaxHealth), 9f), accent);
+    }
+
+    void DrawHudRect(Rect rect, Color color) {
+        Color previous = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = previous;
+    }
+
+    void DrawReticle(float centerX, Color color) {
+        float midY = Screen.height * .5f;
+        DrawHudRect(new Rect(centerX - 8f, midY - 1f, 6f, 2f), color);
+        DrawHudRect(new Rect(centerX + 2f, midY - 1f, 6f, 2f), color);
+        DrawHudRect(new Rect(centerX - 1f, midY - 8f, 2f, 6f), color);
+        DrawHudRect(new Rect(centerX - 1f, midY + 2f, 2f, 6f), color);
+        DrawHudRect(new Rect(centerX - 1f, midY - 1f, 2f, 2f), Color.white);
     }
 
     static int SpellIndex(string spell) {
