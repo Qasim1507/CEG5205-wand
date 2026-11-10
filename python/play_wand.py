@@ -26,9 +26,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--player1-port", help="Player 1 Arduino serial port")
     parser.add_argument("--player2-port", help="Player 2 Arduino serial port")
+    parser.add_argument("--online-duel", action="store_true",
+                        help="use the LAN host/join duel mode with one Arduino on this laptop")
     parser.add_argument("--model", default=str(BUNDLE_ROOT / "models" / "gesture_model.joblib"))
     parser.add_argument("--unity-host", default="127.0.0.1",
-                        help="computer running the Unity game (default: this computer)")
+                        help="IP address of the Unity game (Quest or desktop; default: this computer)")
     parser.add_argument("--unity-port", type=int, default=5055)
     parser.add_argument("--min-confidence", type=float, default=0.55)
     parser.add_argument("--wand-axes", default="y,x,-z")
@@ -37,6 +39,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.player2_port and not args.player1_port:
         parser.error("--player2-port requires --player1-port")
+    if args.online_duel and args.player2_port:
+        parser.error("--online-duel uses one Arduino per game instance; omit --player2-port")
     if args.player1_port and args.player1_port == args.player2_port:
         parser.error("players must use two different serial ports")
     if not 0 <= args.min_confidence <= 1:
@@ -60,6 +64,10 @@ def choose_ports(args: argparse.Namespace) -> tuple[str, ...]:
     if not ports:
         raise RuntimeError("no Arduino serial port detected. Connect a wand or "
                            "pass --player1-port to select it.")
+    if args.online_duel:
+        if len(ports) > 1:
+            print("LAN PvP uses one Arduino per game instance; using the first detected port.")
+        return (ports[0],)
     if len(ports) > 2:
         print("More than two Arduino ports found; using the first two. "
               "Use the --playerN-port options to choose explicitly.")
@@ -96,13 +104,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(exc)
         return 1
 
-    mode = "single" if len(ports) == 1 else "duel"
+    mode = "online" if args.online_duel else ("single" if len(ports) == 1 else "duel")
 
     model = load_model(Path(args.model).expanduser().resolve())
     print(f"model: {model.name} ({model.accuracy:.1%} {model.scheme})")
     print("Connected controllers: " + " | ".join(
         f"Player {i + 1}: {port}" for i, port in enumerate(ports)))
-    print("Mode: " + ("you vs the Wand Bot" if mode == "single" else "two-player PvP"))
+    mode_label = {"single": "you vs the Wand Bot", "duel": "two-player local PvP",
+                  "online": "LAN PvP"}[mode]
+    print("Mode: " + mode_label)
     print("Keep the connected wand(s) still for calibration."
           if getattr(sys, "frozen", False) else
           "Keep the connected wand(s) still for calibration and start the "

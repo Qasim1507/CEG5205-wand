@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using UnityEngine;
 
-/// <summary>Small LAN host/join link for two standalone Quest duel clients.</summary>
+/// <summary>Small LAN host/join link for two duel clients on the same local network.</summary>
 public sealed class QuestDuelNetwork : MonoBehaviour {
     const int Port = 5060;
 
@@ -57,6 +57,7 @@ public sealed class QuestDuelNetwork : MonoBehaviour {
     public event Action<int> SessionReady;
     public event Action<Snapshot> StateReceived;
     public event Action<SpellEvent> SpellReceived;
+    public event Action<SpellEvent> SpellRequested;
 
     public void StartHosting() {
         if (IsActive) return;
@@ -148,6 +149,8 @@ public sealed class QuestDuelNetwork : MonoBehaviour {
             StateReceived?.Invoke(packet.state);
         else if (packet.type == "spell" && packet.shot != null)
             SpellReceived?.Invoke(packet.shot);
+        else if (host && packet.type == "request" && packet.shot != null)
+            SpellRequested?.Invoke(packet.shot);
     }
 
     public void SendState(Snapshot state) {
@@ -158,6 +161,11 @@ public sealed class QuestDuelNetwork : MonoBehaviour {
     public void SendSpell(SpellEvent spell) {
         if (!host || !connected || peer == null || spell == null) return;
         SendTo(new Packet { type = "spell", shot = spell }, peer);
+    }
+
+    public void RequestSpell(SpellEvent spell) {
+        if (host || !connected || peer == null || spell == null) return;
+        SendTo(new Packet { type = "request", shot = spell }, peer);
     }
 
     void SendTo(Packet packet, IPEndPoint destination) {

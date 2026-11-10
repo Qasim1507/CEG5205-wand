@@ -191,8 +191,9 @@ recognize spell gestures; the mouse aims and the keyboard handles movement.
 Keeping the camera level avoids roll from wand motion.
 
 To try the flow in Unity Editor, open
-`unity/Assets/Scenes/WandSpellsMeetingDemo.unity` and press **Play**, connect one
-or two Arduino boards, then run:
+`unity/Assets/Scenes/WandSpellsMeetingDemo.unity` but leave it out of Play mode.
+Connect one or two Arduino boards, start the Python command, then switch to
+Unity and press **Play while the wand(s) are calibrating**:
 
 **macOS:**
 
@@ -254,6 +255,54 @@ The Quest duel is a LAN prototype: it needs Wi-Fi that allows devices to talk
 to each other, and the headset build must be rebuilt after Unity code changes.
 The packaged APK may not contain the latest duel code. Local desktop PvP remains
 available separately through Unity Editor or the desktop launcher.
+
+### Mixed Quest and desktop PvP (two laptops)
+
+One player can use a Quest while the other plays on a desktop monitor. Each
+player connects one Arduino to their own laptop. Both laptops, the Quest, and
+both game clients must be on the same Wi-Fi network. Build and install this
+branch's APK on the Quest first.
+
+On the Quest player's laptop, start the Python bridge with the Quest's Wi-Fi IP.
+Then launch the app on the headset. On the desktop player's laptop, open the
+Unity project and duel scene, start Python, and press **Play** in Unity while
+the wand is calibrating. Each player should run one of these commands, using
+their own Arduino port:
+
+**Mac — Quest player's laptop:**
+
+```bash
+.venv/bin/python python/play_wand.py --online-duel --player1-port /dev/cu.usbmodemXXXX --unity-host QUEST_WIFI_IP
+```
+
+**Mac — desktop player's laptop:**
+
+```bash
+.venv/bin/python python/play_wand.py --online-duel --player1-port /dev/cu.usbmodemYYYY --unity-host 127.0.0.1
+```
+
+**Windows — Quest player's laptop (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py --online-duel --player1-port COM3 --unity-host QUEST_WIFI_IP
+```
+
+**Windows — desktop player's laptop (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py --online-duel --player1-port COM4 --unity-host 127.0.0.1
+```
+
+Replace the example Arduino ports and `QUEST_WIFI_IP`. Once both games are
+running, choose a host: the Quest host presses **A**; the desktop host presses
+**H**. The other player joins by pressing **X** on Quest or **J** on desktop.
+Each player sees only their own full-screen point of view. The Quest player aims
+with their head and moves with the left stick; the desktop player aims with the
+mouse and moves with **WASD**. Wand gestures cast spells for the local player.
+
+This peer-to-peer setup is for the same local network. Guest Wi-Fi or client
+isolation may block discovery. Playing from different networks would require an
+internet relay or a publicly reachable server.
 
 ### Build a one-file desktop launcher
 

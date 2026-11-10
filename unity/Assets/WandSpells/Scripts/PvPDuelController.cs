@@ -38,6 +38,8 @@ public sealed class PvPDuelController : MonoBehaviour {
     bool roundOver;
     bool botOpponent;
     bool questRuntime;
+    bool networkDuel;
+    bool localDualWands;
     QuestDuelNetwork questNetwork;
     int localPlayerId = 1;
     readonly Vector3[] questHeadPositions = new Vector3[2];
@@ -77,11 +79,11 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void Update() {
         EnsureQuestNetwork();
-        if (questRuntime && questNetwork != null && !started) HandleQuestPairingInput();
+        if (networkDuel && questNetwork != null && !started) HandleQuestPairingInput();
         if (started && Input.GetKeyDown(KeyCode.F2)) ResetRound();
         if (started) UpdateMouseAim();
         if (started && !roundOver) UpdatePlayerMovement();
-        if (started && questRuntime) SendQuestState();
+        if (started && networkDuel) SendQuestState();
         if (started && botOpponent && !roundOver && Time.time >= nextBotCastAt)
             BotAttack();
         if (centerRune != null) {
@@ -103,10 +105,21 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnModeRequested(string mode) {
-        if (XRSettings.isDeviceActive && mode == "duel") {
+        if (mode == "online") {
+            networkDuel = true;
+            localDualWands = false;
             botOpponent = false;
+            EnsureQuestNetwork();
             return;
         }
+        if (XRSettings.isDeviceActive && mode == "duel") {
+            networkDuel = true;
+            localDualWands = true;
+            botOpponent = false;
+            EnsureQuestNetwork();
+            return;
+        }
+        if (mode == "single") networkDuel = false;
         bool firstModePacket = !started;
         botOpponent = mode == "single";
         if (firstModePacket) nextBotCastAt = Time.time + Random.Range(2f, 3.5f);
@@ -114,13 +127,15 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void EnsureQuestNetwork() {
-        if (!XRSettings.isDeviceActive || questNetwork != null) return;
-        questRuntime = true;
+        questRuntime = XRSettings.isDeviceActive;
+        if (questRuntime && !started && !botOpponent) networkDuel = true;
+        if ((!questRuntime && !networkDuel) || questNetwork != null) return;
         questNetwork = GetComponent<QuestDuelNetwork>();
         if (questNetwork == null) questNetwork = gameObject.AddComponent<QuestDuelNetwork>();
         questNetwork.SessionReady += OnQuestSessionReady;
         questNetwork.StateReceived += OnQuestStateReceived;
         questNetwork.SpellReceived += OnQuestSpellReceived;
+        questNetwork.SpellRequested += OnQuestSpellRequested;
     }
 
     void HandleQuestPairingInput() {
@@ -143,7 +158,7 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnQuestStateReceived(QuestDuelNetwork.Snapshot state) {
-        if (!started || !questRuntime || state == null) return;
+        if (!started || !networkDuel || state == null) return;
         int remoteIndex = 1 - (localPlayerId - 1);
         playerRigs[remoteIndex].position = state.rigPosition;
         playerRigs[remoteIndex].rotation = state.rigRotation;
@@ -153,11 +168,14 @@ public sealed class PvPDuelController : MonoBehaviour {
             health[0] = state.playerOneHealth;
             health[1] = state.playerTwoHealth;
             UpdateHealthUi();
+            roundOver = health[0] <= 0f || health[1] <= 0f;
+            if (victoryPanel != null) victoryPanel.SetActive(roundOver);
+            if (victoryText != null) victoryText.gameObject.SetActive(roundOver);
         }
     }
 
     void OnQuestSpellReceived(QuestDuelNetwork.SpellEvent spellEvent) {
-        if (!started || !questRuntime || spellEvent == null) return;
+        if (!started || !networkDuel || spellEvent == null) return;
         StartCoroutine(ShowNetworkSpell(spellEvent));
     }
 
@@ -172,24 +190,25 @@ public sealed class PvPDuelController : MonoBehaviour {
         };
         var demo = FindObjectOfType<WandSpellDemoController>();
         if (demo != null) {
-            if (questRuntime) demo.ActivateDuelAt(spawns[localIndex], spawnRotations[localIndex]);
+            if (networkDuel || questRuntime) demo.ActivateDuelAt(spawns[localIndex], spawnRotations[localIndex]);
             else demo.ActivateDesktopDuel();
         }
         gameCamera = Camera.main;
         if (gameCamera == null) return;
         started = true;
         Transform sceneRig = demo != null && demo.DesktopRig != null ? demo.DesktopRig : gameCamera.transform;
-        if (questRuntime) {
+        if (networkDuel || questRuntime) {
             playerRigs[localIndex] = sceneRig;
             playerRigs[localIndex].position = spawns[localIndex];
             playerRigs[localIndex].rotation = spawnRotations[localIndex];
             int remoteIndex = 1 - localIndex;
-            playerRigs[remoteIndex] = new GameObject("Remote Quest player rig").transform;
+            playerRigs[remoteIndex] = new GameObject("Remote duel player rig").transform;
             playerRigs[remoteIndex].position = spawns[remoteIndex];
             playerRigs[remoteIndex].rotation = spawnRotations[remoteIndex];
             playerCameras[localIndex] = gameCamera;
             playerCameras[remoteIndex] = null;
             gameCamera.rect = new Rect(0f, 0f, 1f, 1f);
+            if (!questRuntime) gameCamera.fieldOfView = 72f;
         } else {
             playerRigs[0] = sceneRig;
             playerRigs[0].position = spawns[0];
@@ -203,7 +222,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         }
         cameraHomeRotation[0] = spawnRotations[0];
         cameraHomeRotation[1] = spawnRotations[1];
-        if (!questRuntime) {
+        if (!networkDuel && !questRuntime) {
             var secondCameraObject = new GameObject("Player 2 camera");
             secondCameraObject.transform.SetParent(playerRigs[1], false);
             secondCameraObject.transform.localPosition = new Vector3(0f, 1.65f, 0f);
@@ -217,22 +236,22 @@ public sealed class PvPDuelController : MonoBehaviour {
             playerCameras[1].clearFlags = gameCamera.clearFlags;
             playerCameras[1].backgroundColor = gameCamera.backgroundColor;
             playerCameras[1].enabled = !botOpponent;
-        } else playerCameras[1] = null;
+        } else playerCameras[1 - localIndex] = null;
 
         CreateFpsDuelist(0, spawns[0], new Color(.18f, .70f, 1f));
         CreateFpsDuelist(1, spawns[1], new Color(1f, .32f, .20f));
         SetDuelWorldScale(2.25f);
         SetPlayerLayer(playerBodies[0].gameObject, 30);
         SetPlayerLayer(playerBodies[1].gameObject, 31);
-        if (questRuntime) gameCamera.cullingMask &= ~(1 << (localIndex == 0 ? 30 : 31));
+        if (networkDuel || questRuntime) gameCamera.cullingMask &= ~(1 << (localIndex == 0 ? 30 : 31));
         else {
             gameCamera.cullingMask &= ~(1 << 30);
             if (playerCameras[1] != null) playerCameras[1].cullingMask &= ~(1 << 31);
         }
         BuildArcaneDuelDecor();
         botHome = playerRigs[1];
-        aimScreenPositions[0] = new Vector2(Screen.width * (botOpponent ? .5f : .25f), Screen.height * .5f);
-        aimScreenPositions[1] = new Vector2(Screen.width * .75f, Screen.height * .5f);
+        aimScreenPositions[0] = new Vector2(Screen.width * (networkDuel ? .5f : botOpponent ? .5f : .25f), Screen.height * .5f);
+        aimScreenPositions[1] = new Vector2(Screen.width * (networkDuel ? .5f : .75f), Screen.height * .5f);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = !questRuntime;
         UpdateHealthUi();
@@ -259,7 +278,8 @@ public sealed class PvPDuelController : MonoBehaviour {
             aimLocked = !aimLocked;
             if (aimLocked) {
                 lockedCursorPosition = Input.mousePosition;
-                activeAimPlayer = botOpponent || lockedCursorPosition.x < Screen.width * .5f ? 0 : 1;
+                activeAimPlayer = networkDuel ? localPlayerId - 1 :
+                    botOpponent || lockedCursorPosition.x < Screen.width * .5f ? 0 : 1;
                 lockedAimPlayer = activeAimPlayer;
                 aimScreenPositions[lockedAimPlayer] = lockedCursorPosition;
                 SetFeed("AIM LOCKED  •  WAND GESTURE TO CAST", new Color(1f, .82f, .25f));
@@ -272,7 +292,8 @@ public sealed class PvPDuelController : MonoBehaviour {
             return;
         }
         Vector2 mousePosition = Input.mousePosition;
-        activeAimPlayer = botOpponent || mousePosition.x < Screen.width * .5f ? 0 : 1;
+        activeAimPlayer = networkDuel ? localPlayerId - 1 :
+            botOpponent || mousePosition.x < Screen.width * .5f ? 0 : 1;
         if (playerCameras[activeAimPlayer] == null) activeAimPlayer = 0;
         Rect viewport = playerCameras[activeAimPlayer].pixelRect;
         mousePosition.x = Mathf.Clamp(mousePosition.x, viewport.xMin + 2f, viewport.xMax - 2f);
@@ -282,7 +303,7 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     Ray GetAimRay(int playerIndex) {
         var aimCamera = playerCameras[playerIndex];
-        if (questRuntime && questNetwork != null && questNetwork.IsConnected &&
+        if (networkDuel && questNetwork != null && questNetwork.IsConnected &&
             playerIndex != localPlayerId - 1)
             return new Ray(questHeadPositions[playerIndex], questHeadRotations[playerIndex] * Vector3.forward);
         if (aimCamera == null) return new Ray(playerRigs[playerIndex].position + Vector3.up, playerRigs[playerIndex].forward);
@@ -550,6 +571,9 @@ public sealed class PvPDuelController : MonoBehaviour {
             MoveQuestPlayer();
             if (botOpponent && botHome != null)
                 botHome.position = new Vector3(Mathf.Sin(Time.time * .35f) * 6f, 0f, 14f);
+        } else if (networkDuel) {
+            int localIndex = localPlayerId - 1;
+            MovePlayer(localIndex, KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D);
         } else {
             MovePlayer(0, KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D);
             if (!botOpponent) MovePlayer(1, KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.LeftArrow, KeyCode.RightArrow);
@@ -561,7 +585,7 @@ public sealed class PvPDuelController : MonoBehaviour {
                 if (questRuntime && playerCameras[i] != null) {
                     playerBodies[i].position = playerCameras[i].transform.position - Vector3.up * 1.6f;
                     playerBodies[i].rotation = playerCameras[i].transform.rotation * Quaternion.Euler(0f, 180f, 0f);
-                } else if (questRuntime && i != localPlayerId - 1 && questHeadPositions[i] != Vector3.zero) {
+                } else if (networkDuel && i != localPlayerId - 1 && questHeadPositions[i] != Vector3.zero) {
                     playerBodies[i].position = questHeadPositions[i] - Vector3.up * 1.6f;
                     playerBodies[i].rotation = questHeadRotations[i] * Quaternion.Euler(0f, 180f, 0f);
                 } else {
@@ -589,17 +613,18 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void SendQuestState() {
-        if (questNetwork == null || !questNetwork.IsConnected || Time.unscaledTime < nextNetworkStateAt) return;
+        if (!networkDuel || questNetwork == null || !questNetwork.IsConnected || Time.unscaledTime < nextNetworkStateAt) return;
         nextNetworkStateAt = Time.unscaledTime + .05f;
         int index = localPlayerId - 1;
         var rig = playerRigs[index];
         var view = playerCameras[index];
         if (rig == null || view == null) return;
+        Ray aim = GetAimRay(index);
         questNetwork.SendState(new QuestDuelNetwork.Snapshot {
             rigPosition = rig.position,
             rigRotation = rig.rotation,
-            headPosition = view.transform.position,
-            headRotation = view.transform.rotation,
+            headPosition = questRuntime ? view.transform.position : aim.origin,
+            headRotation = questRuntime ? view.transform.rotation : Quaternion.LookRotation(aim.direction, Vector3.up),
             playerOneHealth = health[0],
             playerTwoHealth = health[1]
         });
@@ -783,6 +808,7 @@ public sealed class PvPDuelController : MonoBehaviour {
     void OnPose(int player, Quaternion pose) {
         if (player < 1 || player > 2) return;
         if (!started) return; // Wait for the launcher mode packet so solo doesn't briefly start as PvP.
+        if (networkDuel && player == 1) player = localPlayerId;
         var index = player - 1;
         if (!poseCalibrated[index]) {
             poseNeutral[index] = pose;
@@ -797,12 +823,25 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void OnCast(int player, string spell, float confidence) {
         if (player < 1 || player > 2 || confidence < .55f) return;
+        if (networkDuel && !questNetwork.IsHost && player == 1) player = localPlayerId;
         if (botOpponent && player != 1) return;
         if (!started) return;
-        if (questRuntime && questNetwork != null && questNetwork.IsActive && !questNetwork.IsHost) return;
+        if (networkDuel && player != localPlayerId &&
+            !(questNetwork.IsHost && localDualWands && player == 2)) return;
         if (roundOver || Time.time - lastCast[player - 1] < Cooldown) return;
         int spellIndex = SpellIndex(spell);
         if (spellIndex < 0) return;
+        int attacker = player - 1;
+        Ray ray = GetAimRay(attacker);
+        if (networkDuel && !questNetwork.IsHost) {
+            if (questNetwork.IsConnected)
+                questNetwork.RequestSpell(new QuestDuelNetwork.SpellEvent {
+                    player = player, spell = spellIndex, origin = ray.origin,
+                    target = ray.GetPoint(18f), landed = false
+                });
+            lastCast[player - 1] = Time.time;
+            return;
+        }
         SetFeed("PLAYER " + player + " CASTS " + SpellName(spellIndex), SpellColor(spellIndex));
         lastCast[player - 1] = Time.time;
         if (botOpponent && player == 1) {
@@ -812,26 +851,47 @@ public sealed class PvPDuelController : MonoBehaviour {
             nextBotCastAt = Mathf.Min(nextBotCastAt, Time.time + reaction);
             lastHumanCastAt = Time.time;
         }
-        int attacker = player - 1;
         var aimCamera = playerCameras[attacker];
         bool landed = false;
         Vector3 impact = playerBodies[1 - attacker] != null
             ? playerBodies[1 - attacker].position : Vector3.zero;
-        Ray ray = GetAimRay(attacker);
         RaycastHit hit;
-        bool canAim = aimCamera != null || (questRuntime && questNetwork != null &&
+        bool canAim = aimCamera != null || (networkDuel && questNetwork != null &&
             questNetwork.IsHost && questNetwork.IsConnected);
         if (canAim && Physics.Raycast(ray, out hit, 120f)) {
             impact = hit.point;
             landed = hit.transform == playerBodies[1 - attacker] ||
                 (playerBodies[1 - attacker] != null && hit.transform.IsChildOf(playerBodies[1 - attacker]));
         }
-        if (questRuntime && questNetwork != null && questNetwork.IsHost)
+        if (networkDuel && questNetwork != null && questNetwork.IsHost)
             questNetwork.SendSpell(new QuestDuelNetwork.SpellEvent {
                 player = player, spell = spellIndex, origin = ray.origin,
                 target = landed ? impact : ray.GetPoint(18f), landed = landed
             });
         StartCoroutine(SpellFlight(attacker, spellIndex, landed, impact));
+    }
+
+    void OnQuestSpellRequested(QuestDuelNetwork.SpellEvent request) {
+        if (!networkDuel || !started || !questNetwork.IsHost || request == null) return;
+        int remotePlayer = 3 - localPlayerId;
+        if (request.player != remotePlayer || request.spell < 0 || request.spell > 3 || roundOver) return;
+        int attacker = request.player - 1;
+        if (Time.time - lastCast[attacker] < Cooldown) return;
+        lastCast[attacker] = Time.time;
+        Ray ray = new Ray(request.origin, (request.target - request.origin).normalized);
+        RaycastHit hit;
+        bool landed = Physics.Raycast(ray, out hit, 120f) &&
+            (hit.transform == playerBodies[localPlayerId - 1] ||
+             hit.transform.IsChildOf(playerBodies[localPlayerId - 1]));
+        Vector3 impact = landed ? hit.point : ray.GetPoint(18f);
+        var result = new QuestDuelNetwork.SpellEvent {
+            player = request.player, spell = request.spell,
+            origin = request.origin, target = impact, landed = landed
+        };
+        questNetwork.SendSpell(result);
+        SetFeed("PLAYER " + request.player + (landed ? " HITS!" : " MISSES"), SpellColor(request.spell));
+        StartCoroutine(ShowNetworkSpell(result));
+        if (landed) ApplyDamage(localPlayerId - 1, request.spell);
     }
 
     void BotAttack() {
@@ -1089,7 +1149,7 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnGUI() {
-        if (questRuntime && !started) {
+        if (networkDuel && !started) {
             DrawHudRect(new Rect(Screen.width * .18f, Screen.height * .35f,
                 Screen.width * .64f, Screen.height * .30f), new Color(.018f, .024f, .065f, .94f));
             var warningStyle = new GUIStyle(GUI.skin.label) {
@@ -1099,13 +1159,15 @@ public sealed class PvPDuelController : MonoBehaviour {
                 wordWrap = true
             };
             warningStyle.normal.textColor = new Color(.88f, .94f, 1f);
-            string pairingStatus = questNetwork == null ? "Starting Quest link..." :
+            string pairingStatus = questNetwork == null ? "Starting LAN link..." :
                 questNetwork.IsHost && !questNetwork.IsConnected ? "HOST READY  •  WAITING FOR PLAYER 2 TO JOIN" :
                 !questNetwork.IsHost && questNetwork.IsActive ? "SEARCHING FOR PLAYER 1 ON THIS WI-FI..." :
-                "PLAYER 1: PRESS A ON RIGHT CONTROLLER TO HOST\nPLAYER 2: PRESS X ON LEFT CONTROLLER TO JOIN";
+                questRuntime
+                    ? "PLAYER 1: PRESS A TO HOST\nPLAYER 2: PRESS X TO JOIN"
+                    : "PLAYER 1: PRESS H TO HOST\nPLAYER 2: PRESS J TO JOIN";
             GUI.Label(new Rect(Screen.width * .20f, Screen.height * .37f,
                 Screen.width * .60f, Screen.height * .26f),
-                "QUEST WAND DUEL\n" + pairingStatus, warningStyle);
+                "ONLINE WAND DUEL\n" + pairingStatus, warningStyle);
             return;
         }
         if (!started) return;
@@ -1113,7 +1175,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         if (botOpponent) {
             DrawHealthPanel(0, 18f, 202f, "YOU");
             DrawHealthPanel(1, Screen.width - 220f, 202f, "WAND BOT");
-        } else if (questRuntime) {
+        } else if (networkDuel) {
             int localIndex = localPlayerId - 1;
             DrawHealthPanel(localIndex, 18f, half - 36f, "YOU");
             DrawHealthPanel(1 - localIndex, half + 18f, half - 36f, "OPPONENT");
@@ -1134,7 +1196,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         DrawHudRect(new Rect(Screen.width * .34f, 14f, 3f, 40f), new Color(.2f, .75f, 1f));
         GUI.Label(new Rect(Screen.width * .34f, 14f, Screen.width * .32f, 40f),
             botOpponent ? "ARCANE DUEL  <size=13>•  SOLO TRIAL</size>" :
-                questRuntime ? "ARCANE DUEL  <size=13>•  QUEST ONLINE</size>" :
+                networkDuel ? "ARCANE DUEL  <size=13>•  ONLINE" + (questRuntime ? " QUEST" : " DESKTOP") + "</size>" :
                 "ARCANE DUEL  <size=13>•  LOCAL RIVALS</size>", titleStyle);
 
         var hintStyle = new GUIStyle(GUI.skin.label) {
@@ -1147,19 +1209,23 @@ public sealed class PvPDuelController : MonoBehaviour {
             Screen.width * .70f, 30f), new Color(.025f, .035f, .09f, .82f));
         GUI.Label(new Rect(Screen.width * .15f, Screen.height - 43f,
             Screen.width * .70f, 30f), questRuntime
-                ? "LOOK TO AIM  •  WAND GESTURE TO CAST"
-                : botOpponent
+                ? "LOOK TO AIM  •  LEFT STICK MOVE  •  WAND GESTURE CAST"
+                : networkDuel
+                    ? "WASD MOVE  •  MOUSE AIM  •  SPACE LOCK / UNLOCK  •  WAND GESTURE CAST"
+                    : botOpponent
                     ? "WASD MOVE  •  MOUSE AIM  •  SPACE LOCK / UNLOCK  •  WAND GESTURE CAST"
                     : "P1 WASD  •  P2 ARROWS  •  MOVE MOUSE INTO YOUR HALF TO AIM  •  SPACE LOCKS AIM", hintStyle);
-        if (!questRuntime && !botOpponent) {
+        if (!questRuntime && !botOpponent && !networkDuel) {
             DrawHudRect(new Rect(half - 1f, 0f, 2f, Screen.height), new Color(.48f, .72f, 1f, .75f));
             DrawReticle(aimScreenPositions[0], aimLocked && lockedAimPlayer == 0
                 ? new Color(1f, .82f, .25f) : new Color(.2f, .82f, 1f));
             DrawReticle(aimScreenPositions[1], aimLocked && lockedAimPlayer == 1
                 ? new Color(1f, .82f, .25f) : new Color(1f, .38f, .23f));
-        } else if (!questRuntime)
-            DrawReticle(aimScreenPositions[0], aimLocked
+        } else if (!questRuntime) {
+            int reticleIndex = networkDuel ? localPlayerId - 1 : 0;
+            DrawReticle(aimScreenPositions[reticleIndex], aimLocked
                 ? new Color(1f, .82f, .25f) : new Color(.58f, .86f, 1f));
+        }
 
         if (Time.time < feedUntil && !string.IsNullOrEmpty(feedText)) {
             var feedStyle = new GUIStyle(titleStyle) { fontSize = Mathf.Clamp(Screen.height / 25, 20, 34) };
@@ -1183,7 +1249,7 @@ public sealed class PvPDuelController : MonoBehaviour {
             GUI.Label(new Rect(Screen.width * .22f, Screen.height * .36f,
                 Screen.width * .56f, Screen.height * .23f),
                 botOpponent ? (health[0] > 0 ? "YOU WIN!" : "BOT WINS") :
-                    questRuntime
+                    networkDuel
                         ? (health[localPlayerId - 1] > 0 ? "YOU WIN!" : "YOU LOSE")
                         : (health[0] > 0 ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!"), resultStyle);
         }

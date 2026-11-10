@@ -349,7 +349,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             try {
                 var packet = JsonUtility.FromJson<SensorPacket>(message.json);
                 if (packet == null) continue;
-                if (packet.mode == "duel" || packet.mode == "single")
+                if (packet.mode == "duel" || packet.mode == "single" || packet.mode == "online")
                     GameModeRequested?.Invoke(packet.mode);
                 if (packet.player == 1 || packet.player == 2) {
                     int playerIndex = packet.player - 1;
@@ -393,7 +393,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                 }
                 if (packet.type == "ping") {
                     SendReply(message.endpoint, packet, packet.mode == "duel" ? "duel" :
-                        packet.mode == "single" ? "single" :
+                        packet.mode == "single" ? "single" : packet.mode == "online" ? "online" :
                         arenaReady ? "ready" : "choose_wand");
                     continue;
                 }
