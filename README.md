@@ -179,14 +179,16 @@ also play with the mouse alone using the desktop controls below.
 
 The desktop launcher uses connected Arduinos as controllers and selects the
 match automatically. One wand starts a solo match against the Wand Bot; two
-wands start local PvP. Each wand has its own gesture recognition. Spells
-use the wand's orientation for aim, and a spell only hits when its aim ray reaches
-the opponent. Both players start with 100 health, and lightning hits hardest.
+wands start local PvP. Each wand has its own gesture recognition. On desktop,
+the mouse cursor aims, and spells only hit when the aim ray reaches the opponent.
+Press **Space** to lock/unlock the cursor position while making a wand gesture
+to cast. Both players start with 100 health, and lightning hits hardest.
 Solo mode uses the same level against a bot; the bot moves and adapts its casting
 pace to the health lead. In two-player mode, the existing level is shown in
 split-screen, with each player moving from the keyboard. The first player to
 lose all health loses the round; health resets after a short pause. The IMUs
-track wand orientation, while the keyboard handles movement.
+recognize spell gestures; the mouse aims and the keyboard handles movement.
+Keeping the camera level avoids roll from wand motion.
 
 To try the flow in Unity Editor, open
 `unity/Assets/Scenes/WandSpellsMeetingDemo.unity` and press **Play**, connect one
@@ -210,8 +212,13 @@ window to recenter the wand(s); press **Q/Esc** to quit. Port order can be set
 with `--player1-port` and optional `--player2-port`.
 
 In the game, **WASD** moves Player 1. In two-wand PvP, **arrow keys** move
-Player 2. Aim by moving each wand; recognized gestures cast spells. Press **F2**
-to restart a round.
+Player 2. Move the mouse into a player's screen half to aim for them; **Space**
+locks or releases the aim point. A recognized wand gesture casts the spell.
+Press **F2** to restart a round.
+
+The project includes Unity OpenXR and Meta OpenXR support. Quest's single-wand
+mode uses headset direction to aim, but local two-player split-screen is a
+desktop mode and is not supported in the headset.
 
 ### Build a one-file desktop launcher
 

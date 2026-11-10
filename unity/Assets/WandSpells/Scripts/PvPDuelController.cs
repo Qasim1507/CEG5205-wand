@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.XR;
 
 /// <summary>
 /// Local wand game view. A second connected Arduino enables PvP; with one wand,
@@ -35,6 +37,13 @@ public sealed class PvPDuelController : MonoBehaviour {
     bool started;
     bool roundOver;
     bool botOpponent;
+    bool questRuntime;
+    bool questDuelUnsupported;
+    bool aimLocked;
+    int activeAimPlayer;
+    int lockedAimPlayer;
+    Vector2[] aimScreenPositions = new Vector2[2];
+    Vector2 lockedCursorPosition;
     float nextBotCastAt;
     int lastHumanSpell = -1;
     int lastBotSpell = -1;
@@ -64,6 +73,7 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void Update() {
         if (started && Input.GetKeyDown(KeyCode.F2)) ResetRound();
+        if (started) UpdateMouseAim();
         if (started && !roundOver) UpdatePlayerMovement();
         if (started && botOpponent && !roundOver && Time.time >= nextBotCastAt)
             BotAttack();
@@ -86,6 +96,11 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnModeRequested(string mode) {
+        if (XRSettings.isDeviceActive && mode == "duel") {
+            questDuelUnsupported = true;
+            return;
+        }
+        questDuelUnsupported = false;
         bool firstModePacket = !started;
         botOpponent = mode == "single";
         if (firstModePacket) nextBotCastAt = Time.time + Random.Range(2f, 3.5f);
@@ -94,6 +109,7 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void BeginDuel() {
         if (started) return;
+        questRuntime = XRSettings.isDeviceActive;
         var demo = FindObjectOfType<WandSpellDemoController>();
         if (demo != null) demo.ActivateDesktopDuel();
         gameCamera = Camera.main;
@@ -104,33 +120,76 @@ public sealed class PvPDuelController : MonoBehaviour {
         playerRigs[0].position = new Vector3(-2f, 0f, -3.25f);
         playerRigs[0].rotation = Quaternion.Euler(0f, 90f, 0f);
         cameraHomeRotation[0] = playerRigs[0].rotation;
-        gameCamera.rect = botOpponent ? new Rect(0f, 0f, 1f, 1f) : new Rect(0f, 0f, .5f, 1f);
-        gameCamera.fieldOfView = 72f;
+        gameCamera.rect = botOpponent || questRuntime
+            ? new Rect(0f, 0f, 1f, 1f) : new Rect(0f, 0f, .5f, 1f);
+        if (!questRuntime) gameCamera.fieldOfView = 72f;
 
         var secondRig = new GameObject("Player 2 FPS camera rig").transform;
         secondRig.position = new Vector3(2f, 0f, -3.25f);
         secondRig.rotation = Quaternion.Euler(0f, -90f, 0f);
         playerRigs[1] = secondRig;
         cameraHomeRotation[1] = secondRig.rotation;
-        var secondCameraObject = new GameObject("Player 2 camera");
-        secondCameraObject.transform.SetParent(secondRig, false);
-        secondCameraObject.transform.localPosition = new Vector3(0f, 1.65f, 0f);
-        secondCameraObject.transform.localRotation = Quaternion.identity;
-        playerCameras[1] = secondCameraObject.AddComponent<Camera>();
-        playerCameras[1].fieldOfView = 72f;
-        playerCameras[1].rect = new Rect(.5f, 0f, .5f, 1f);
-        playerCameras[1].depth = gameCamera.depth + 1;
-        playerCameras[1].allowHDR = gameCamera.allowHDR;
-        playerCameras[1].allowMSAA = gameCamera.allowMSAA;
-        playerCameras[1].clearFlags = gameCamera.clearFlags;
-        playerCameras[1].backgroundColor = gameCamera.backgroundColor;
-        playerCameras[1].enabled = !botOpponent;
+        if (!questRuntime) {
+            var secondCameraObject = new GameObject("Player 2 camera");
+            secondCameraObject.transform.SetParent(secondRig, false);
+            secondCameraObject.transform.localPosition = new Vector3(0f, 1.65f, 0f);
+            secondCameraObject.transform.localRotation = Quaternion.identity;
+            playerCameras[1] = secondCameraObject.AddComponent<Camera>();
+            playerCameras[1].fieldOfView = 72f;
+            playerCameras[1].rect = new Rect(.5f, 0f, .5f, 1f);
+            playerCameras[1].depth = gameCamera.depth + 1;
+            playerCameras[1].allowHDR = gameCamera.allowHDR;
+            playerCameras[1].allowMSAA = gameCamera.allowMSAA;
+            playerCameras[1].clearFlags = gameCamera.clearFlags;
+            playerCameras[1].backgroundColor = gameCamera.backgroundColor;
+            playerCameras[1].enabled = !botOpponent;
+        } else playerCameras[1] = null;
 
         CreateFpsDuelist(0, new Vector3(-2f, 0f, -3.25f), new Color(.18f, .70f, 1f));
         CreateFpsDuelist(1, new Vector3(2f, 0f, -3.25f), new Color(1f, .32f, .20f));
         BuildArcaneDuelDecor();
         botHome = playerRigs[1];
+        aimScreenPositions[0] = new Vector2(Screen.width * (botOpponent ? .5f : .25f), Screen.height * .5f);
+        aimScreenPositions[1] = new Vector2(Screen.width * .75f, Screen.height * .5f);
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = !questRuntime;
         UpdateHealthUi();
+    }
+
+    void UpdateMouseAim() {
+        if (questRuntime) return;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        if (Input.GetKeyDown(KeyCode.Space)) {
+            aimLocked = !aimLocked;
+            if (aimLocked) {
+                lockedCursorPosition = Input.mousePosition;
+                activeAimPlayer = botOpponent || lockedCursorPosition.x < Screen.width * .5f ? 0 : 1;
+                lockedAimPlayer = activeAimPlayer;
+                aimScreenPositions[lockedAimPlayer] = lockedCursorPosition;
+                SetFeed("AIM LOCKED  •  WAND GESTURE TO CAST", new Color(1f, .82f, .25f));
+            } else SetFeed("AIM RELEASED", new Color(.72f, .88f, 1f));
+        }
+        if (aimLocked) {
+            aimScreenPositions[lockedAimPlayer] = lockedCursorPosition;
+            if (Input.mousePosition != (Vector3)lockedCursorPosition && Mouse.current != null)
+                Mouse.current.WarpCursorPosition(lockedCursorPosition);
+            return;
+        }
+        Vector2 mousePosition = Input.mousePosition;
+        activeAimPlayer = botOpponent || mousePosition.x < Screen.width * .5f ? 0 : 1;
+        if (playerCameras[activeAimPlayer] == null) activeAimPlayer = 0;
+        Rect viewport = playerCameras[activeAimPlayer].pixelRect;
+        mousePosition.x = Mathf.Clamp(mousePosition.x, viewport.xMin + 2f, viewport.xMax - 2f);
+        mousePosition.y = Mathf.Clamp(mousePosition.y, viewport.yMin + 2f, viewport.yMax - 2f);
+        aimScreenPositions[activeAimPlayer] = mousePosition;
+    }
+
+    Ray GetAimRay(int playerIndex) {
+        var aimCamera = playerCameras[playerIndex];
+        if (aimCamera == null) return new Ray(playerRigs[playerIndex].position, playerRigs[playerIndex].forward);
+        if (questRuntime) return new Ray(aimCamera.transform.position, aimCamera.transform.forward);
+        return aimCamera.ScreenPointToRay(aimScreenPositions[playerIndex]);
     }
 
     void CreateFpsDuelist(int index, Vector3 position, Color color) {
@@ -527,8 +586,8 @@ public sealed class PvPDuelController : MonoBehaviour {
             poseCalibrated[index] = true;
         }
         var relativePose = Quaternion.Inverse(poseNeutral[index]) * pose;
-        if (playerRigs[index] != null)
-            playerRigs[index].rotation = cameraHomeRotation[index] * relativePose;
+        // IMU roll made the desktop view tilt. Keep the horizon level and let
+        // the mouse cursor set the shot direction; retain pose on the wand prop.
         if (wands[index] != null)
             wands[index].rotation = cameraHomeRotation[index] * relativePose;
     }
@@ -555,7 +614,7 @@ public sealed class PvPDuelController : MonoBehaviour {
         Vector3 impact = playerBodies[1 - attacker] != null
             ? playerBodies[1 - attacker].position : Vector3.zero;
         if (aimCamera != null) {
-            Ray ray = new Ray(aimCamera.transform.position, aimCamera.transform.forward);
+            Ray ray = GetAimRay(attacker);
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, 40f)) {
                 impact = hit.point;
@@ -606,14 +665,15 @@ public sealed class PvPDuelController : MonoBehaviour {
         int defender = 1 - attacker;
         var color = SpellColor(spellIndex);
         var aimCamera = playerCameras[attacker];
+        Ray aimRay = GetAimRay(attacker);
         Vector3 origin = aimCamera != null
-            ? aimCamera.transform.position + aimCamera.transform.forward * .45f
+            ? aimRay.origin + aimRay.direction * .45f
             : (wands[attacker] != null ? wands[attacker].position : Vector3.up);
         Vector3 defenderPosition = playerBodies[defender] != null
             ? playerBodies[defender].position : Vector3.zero;
         Vector3 target = impactPoint ?? defenderPosition;
         if (!lands && aimCamera != null && target == defenderPosition)
-            target = aimCamera.transform.position + aimCamera.transform.forward * 18f;
+            target = aimRay.origin + aimRay.direction * 18f;
         string[] orbNames = { "orb03_red", "orb03_blue", "orb03_green", "orb03_yellow" };
         var orb = MakeAssetVisual(orbNames[spellIndex], "PvP " + SpellName(spellIndex) + " spell",
             origin, Vector3.one * .58f, PrimitiveType.Sphere, Vector3.one * .45f, color);
@@ -788,6 +848,21 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnGUI() {
+        if (questDuelUnsupported) {
+            DrawHudRect(new Rect(Screen.width * .18f, Screen.height * .35f,
+                Screen.width * .64f, Screen.height * .25f), new Color(.018f, .024f, .065f, .94f));
+            var warningStyle = new GUIStyle(GUI.skin.label) {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.Clamp(Screen.height / 28, 18, 30),
+                fontStyle = FontStyle.Bold,
+                wordWrap = true
+            };
+            warningStyle.normal.textColor = new Color(1f, .82f, .35f);
+            GUI.Label(new Rect(Screen.width * .20f, Screen.height * .37f,
+                Screen.width * .60f, Screen.height * .21f),
+                "LOCAL TWO-PLAYER SPLIT SCREEN IS DESKTOP ONLY\nUse one wand for Quest solo mode.", warningStyle);
+            return;
+        }
         if (!started) return;
         float half = Screen.width * .5f;
         if (botOpponent) {
@@ -821,14 +896,20 @@ public sealed class PvPDuelController : MonoBehaviour {
         DrawHudRect(new Rect(Screen.width * .15f, Screen.height - 43f,
             Screen.width * .70f, 30f), new Color(.025f, .035f, .09f, .82f));
         GUI.Label(new Rect(Screen.width * .15f, Screen.height - 43f,
-            Screen.width * .70f, 30f), botOpponent
-                ? "WASD  MOVE     •     WAND  AIM + CAST     •     F2  NEW ROUND"
-                : "P1  WASD  MOVE     •     P2  ARROWS  MOVE     •     WANDS  AIM + CAST", hintStyle);
-        if (!botOpponent) {
+            Screen.width * .70f, 30f), questRuntime
+                ? "LOOK TO AIM  •  WAND GESTURE TO CAST"
+                : botOpponent
+                    ? "WASD MOVE  •  MOUSE AIM  •  SPACE LOCK / UNLOCK  •  WAND GESTURE CAST"
+                    : "P1 WASD  •  P2 ARROWS  •  MOVE MOUSE INTO YOUR HALF TO AIM  •  SPACE LOCKS AIM", hintStyle);
+        if (!questRuntime && !botOpponent) {
             DrawHudRect(new Rect(half - 1f, 0f, 2f, Screen.height), new Color(.48f, .72f, 1f, .75f));
-            DrawReticle(Screen.width * .25f, new Color(.2f, .82f, 1f));
-            DrawReticle(Screen.width * .75f, new Color(1f, .38f, .23f));
-        } else DrawReticle(Screen.width * .5f, new Color(.58f, .86f, 1f));
+            DrawReticle(aimScreenPositions[0], aimLocked && lockedAimPlayer == 0
+                ? new Color(1f, .82f, .25f) : new Color(.2f, .82f, 1f));
+            DrawReticle(aimScreenPositions[1], aimLocked && lockedAimPlayer == 1
+                ? new Color(1f, .82f, .25f) : new Color(1f, .38f, .23f));
+        } else if (!questRuntime)
+            DrawReticle(aimScreenPositions[0], aimLocked
+                ? new Color(1f, .82f, .25f) : new Color(.58f, .86f, 1f));
 
         if (Time.time < feedUntil && !string.IsNullOrEmpty(feedText)) {
             var feedStyle = new GUIStyle(titleStyle) { fontSize = Mathf.Clamp(Screen.height / 25, 20, 34) };
@@ -886,8 +967,9 @@ public sealed class PvPDuelController : MonoBehaviour {
         GUI.color = previous;
     }
 
-    void DrawReticle(float centerX, Color color) {
-        float midY = Screen.height * .5f;
+    void DrawReticle(Vector2 screenPosition, Color color) {
+        float centerX = screenPosition.x;
+        float midY = Screen.height - screenPosition.y;
         DrawHudRect(new Rect(centerX - 8f, midY - 1f, 6f, 2f), color);
         DrawHudRect(new Rect(centerX + 2f, midY - 1f, 6f, 2f), color);
         DrawHudRect(new Rect(centerX - 1f, midY - 8f, 2f, 6f), color);
