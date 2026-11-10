@@ -14,6 +14,10 @@ using UnityEngine.XR;
 /// CastSpell entry point accepts predictions from the Python IMU model.
 /// </summary>
 public sealed class WandSpellDemoController : MonoBehaviour {
+    public static event Action DuelRequested;
+    public static event Action<int, Quaternion> DuelPoseReceived;
+    public static event Action<int, string, float> DuelCastReceived;
+
     [Serializable]
     sealed class SensorPacket {
         public string type;
@@ -21,6 +25,8 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         public int id;
         public int pose_id;
         public int origin;
+        public int player;
+        public string mode;
         public string spell;
         public float conf;
         public float[] q;
@@ -60,6 +66,10 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     readonly Queue<IncomingPacket> incoming = new Queue<IncomingPacket>();
     string activeSession;
     int lastPacketId;
+    readonly string[] duelSessions = new string[2];
+    readonly int[] duelLastCastIds = new int[2];
+    readonly int[] duelLastPoseIds = new int[2];
+    readonly int[] duelPoseOrigins = { int.MinValue, int.MinValue };
     int gazeChoice = -1;
     float gazeStarted;
     string poseSession;
@@ -302,8 +312,50 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             try {
                 var packet = JsonUtility.FromJson<SensorPacket>(message.json);
                 if (packet == null) continue;
+                if (packet.mode == "duel") DuelRequested?.Invoke();
+                if (packet.player == 1 || packet.player == 2) {
+                    int playerIndex = packet.player - 1;
+                    if (packet.type == "pose") {
+                        if (string.IsNullOrEmpty(packet.session) || packet.q == null || packet.q.Length != 4)
+                            continue;
+                        if (duelSessions[playerIndex] != packet.session) {
+                            duelSessions[playerIndex] = packet.session;
+                            duelLastCastIds[playerIndex] = 0;
+                            duelLastPoseIds[playerIndex] = 0;
+                            duelPoseOrigins[playerIndex] = int.MinValue;
+                        }
+                        if (packet.origin != duelPoseOrigins[playerIndex]) {
+                            duelPoseOrigins[playerIndex] = packet.origin;
+                            duelLastPoseIds[playerIndex] = 0;
+                        }
+                        if (packet.pose_id <= duelLastPoseIds[playerIndex]) continue;
+                        duelLastPoseIds[playerIndex] = packet.pose_id;
+                        var pose = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
+                        float norm = Mathf.Sqrt(pose.x * pose.x + pose.y * pose.y + pose.z * pose.z + pose.w * pose.w);
+                        if (norm > 0.1f) DuelPoseReceived?.Invoke(packet.player, pose.normalized);
+                        continue;
+                    }
+                    if (packet.type == "cast") {
+                        if (string.IsNullOrEmpty(packet.session) || packet.id <= 0) continue;
+                        if (duelSessions[playerIndex] != packet.session) {
+                            duelSessions[playerIndex] = packet.session;
+                            duelLastCastIds[playerIndex] = 0;
+                            duelLastPoseIds[playerIndex] = 0;
+                            duelPoseOrigins[playerIndex] = int.MinValue;
+                        }
+                        if (packet.id <= duelLastCastIds[playerIndex]) {
+                            SendReply(message.endpoint, packet, "duplicate");
+                            continue;
+                        }
+                        duelLastCastIds[playerIndex] = packet.id;
+                        DuelCastReceived?.Invoke(packet.player, packet.spell, packet.conf);
+                        SendReply(message.endpoint, packet, "cast");
+                        continue;
+                    }
+                }
                 if (packet.type == "ping") {
-                    SendReply(message.endpoint, packet, arenaReady ? "ready" : "choose_wand");
+                    SendReply(message.endpoint, packet, packet.mode == "duel" ? "duel" :
+                        arenaReady ? "ready" : "choose_wand");
                     continue;
                 }
                 if (packet.type == "pose") {

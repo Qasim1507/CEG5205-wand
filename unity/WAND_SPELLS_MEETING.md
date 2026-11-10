@@ -32,4 +32,15 @@ follows continuous IMU pose packets. Physical wand position is not tracked. Pres
 A/X on a Quest controller (or R in the laptop predictor) to center its direction.
 Mouse aiming/clicking remains available on desktop.
 
+## Local PvP duel
+
+The Unity Editor scene supports two-player local duels. Connect two
+Arduino/MPU-6050 wands to the same computer, open this scene in Play mode, then
+run `python/pvp_predict.py` from the repository root. Each wand is recognized
+independently and its spells automatically travel to the other player. Both
+players have 100 health; lightning deals the most damage. The first player to
+reach zero health loses, and the next round starts after a short pause. The
+physical wand rotation animates each player's wand, but room position is not
+tracked. This mode uses the Editor and does not run on the included Quest APK.
+
 The scene uses an original generated floor texture, [Poly Haven Medieval Blocks 03](https://polyhaven.com/a/medieval_blocks_03) CC0 wall textures, and [Cinzel](https://github.com/google/fonts/tree/main/ofl/cinzel) under the SIL Open Font License. The font license is included in `Assets/WandSpells/Fonts/OFL.txt`.

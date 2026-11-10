@@ -178,13 +178,16 @@ class LivePredictor:
                  min_confidence: float, log_dir: Path | None,
                  camera: cv2.VideoCapture | None,
                  bridge: UnityBridge | None = None,
-                 wand_axes: str = "y,x,-z") -> None:
+                 wand_axes: str = "y,x,-z", player_id: int = 0) -> None:
         self.model = model
         self.source = source
         self.min_confidence = min_confidence
         self.log_dir = log_dir
         self.camera = camera
         self.bridge = bridge
+        self.player_id = player_id
+        self.window_name = (f"CEG5205 P{player_id} - live spell recognition"
+                            if player_id else WINDOW_NAME)
         self.orientation = WandOrientation(wand_axes)
 
         self.segmenter = gf.GestureSegmenter(
@@ -221,7 +224,8 @@ class LivePredictor:
         for sample in samples:
             self.orientation.update(sample)
         if self.bridge is not None:
-            self.bridge.pose(self.orientation.unity_quaternion(), self.orientation.origin)
+            self.bridge.pose(self.orientation.unity_quaternion(),
+                             self.orientation.origin, self.player_id)
 
         for segment in self.segmenter.push_many(samples):
             self.classify(segment)
@@ -250,7 +254,7 @@ class LivePredictor:
         self.last = cast
         print(f"Gesture: {cast.label or cast.reason} ({cast.confidence:.0%})", flush=True)
         if self.bridge is not None:
-            self.bridge.cast(cast, self.min_confidence)
+            self.bridge.cast(cast, self.min_confidence, self.player_id)
         self.tracer.reset()
         if self.log_dir is not None:
             self.log_segment(cast, t_s, values)
@@ -344,7 +348,9 @@ class LivePredictor:
         """Draw one frame: status, the live trace, and the latest result."""
         canvas = self.background()
 
-        put_text(canvas, "LIVE SPELL RECOGNITION", (50, 60), 0.9, COL_TEXT)
+        title = (f"PLAYER {self.player_id} - LIVE SPELL RECOGNITION"
+                 if self.player_id else "LIVE SPELL RECOGNITION")
+        put_text(canvas, title, (50, 60), 0.9, COL_TEXT)
         put_text(canvas, f"{self.model.name}   {self.model.accuracy:.0%} "
                          f"({self.model.scheme})", (50, 95), 0.5, COL_DIM, 1)
 
@@ -421,14 +427,14 @@ class LivePredictor:
     def run(self, headless: bool = False, duration: float | None = None) -> None:
         """Show the window until the user quits."""
         if not headless:
-            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
+            cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
         started = time.monotonic()
         while duration is None or time.monotonic() - started < duration:
             self.pump()
             if headless:
                 time.sleep(.02)
                 continue
-            cv2.imshow(WINDOW_NAME, self.render())
+            cv2.imshow(self.window_name, self.render())
             key = cv2.waitKey(20) & 0xFF
             if key in KEYS_QUIT:
                 break

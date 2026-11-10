@@ -175,6 +175,38 @@ Wand**, which looks for a headset. If no connection is reported, check Unity is
 in Play mode with the correct scene and UDP port **5055** is available. You can
 also play with the mouse alone using the desktop controls below.
 
+## Local PvP duel with two Arduino wands
+
+Two people can play on one computer using the Unity Editor. Connect both Arduino
+boards by USB, start the same Unity scene in Play mode, and run the duel
+recognizer instead of `live_predict.py`. Each wand has an independent sensor
+stream and gesture recognizer. Recognized spells automatically fly at the other
+player; each player starts with 100 health. Lightning hits hardest, while water,
+wind, and fire deal less damage. The first player to lose all health loses the
+round; health resets after a short pause. Wand orientation animates each
+player's wand, but the IMU does not track room position or support dodging.
+
+The launcher auto-selects the first two detected Arduino ports. To set player
+order explicitly, pass both serial ports:
+
+**macOS:**
+
+```bash
+.venv/bin/python python/pvp_predict.py --player1-port /dev/cu.usbmodem14101 --player2-port /dev/cu.usbmodem14201
+```
+
+**Windows (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\pvp_predict.py --player1-port COM3 --player2-port COM4
+```
+
+Keep both wands still until calibration finishes. The Unity game switches to
+the duel automatically when it receives the PvP recognizer's heartbeat. Press
+**R** in either recognition window to recenter both wands; press **Q/Esc** to
+quit. Run `python/pvp_predict.py --help` for all options. This local PvP mode is
+for the Unity Editor on one shared screen; it does not use the Quest APK.
+
 ## Editing the Unity game
 
 Open [`unity/`](unity/) in Unity Hub with **6000.6.4f1**, then open
