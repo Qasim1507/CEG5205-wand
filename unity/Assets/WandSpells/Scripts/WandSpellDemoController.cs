@@ -14,7 +14,7 @@ using UnityEngine.XR;
 /// CastSpell entry point accepts predictions from the Python IMU model.
 /// </summary>
 public sealed class WandSpellDemoController : MonoBehaviour {
-    public static event Action DuelRequested;
+    public static event Action<string> GameModeRequested;
     public static event Action<int, Quaternion> DuelPoseReceived;
     public static event Action<int, string, float> DuelCastReceived;
 
@@ -312,7 +312,8 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             try {
                 var packet = JsonUtility.FromJson<SensorPacket>(message.json);
                 if (packet == null) continue;
-                if (packet.mode == "duel") DuelRequested?.Invoke();
+                if (packet.mode == "duel" || packet.mode == "single")
+                    GameModeRequested?.Invoke(packet.mode);
                 if (packet.player == 1 || packet.player == 2) {
                     int playerIndex = packet.player - 1;
                     if (packet.type == "pose") {
@@ -355,6 +356,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
                 }
                 if (packet.type == "ping") {
                     SendReply(message.endpoint, packet, packet.mode == "duel" ? "duel" :
+                        packet.mode == "single" ? "single" :
                         arenaReady ? "ready" : "choose_wand");
                     continue;
                 }

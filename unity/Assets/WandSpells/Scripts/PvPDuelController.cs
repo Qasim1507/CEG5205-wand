@@ -2,8 +2,8 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Local two-player duel view. Both Arduino streams arrive through the existing
-/// UDP receiver; each recognized spell automatically attacks the other player.
+/// Local wand game view. A second connected Arduino enables PvP; with one wand,
+/// the second duelist is a lightweight game bot.
 /// </summary>
 public sealed class PvPDuelController : MonoBehaviour {
     const float MaxHealth = 100f;
@@ -19,6 +19,8 @@ public sealed class PvPDuelController : MonoBehaviour {
     Camera gameCamera;
     bool started;
     bool roundOver;
+    bool botOpponent;
+    float nextBotCastAt;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Install() {
@@ -27,19 +29,28 @@ public sealed class PvPDuelController : MonoBehaviour {
     }
 
     void OnEnable() {
-        WandSpellDemoController.DuelRequested += BeginDuel;
+        WandSpellDemoController.GameModeRequested += OnModeRequested;
         WandSpellDemoController.DuelPoseReceived += OnPose;
         WandSpellDemoController.DuelCastReceived += OnCast;
     }
 
     void OnDisable() {
-        WandSpellDemoController.DuelRequested -= BeginDuel;
+        WandSpellDemoController.GameModeRequested -= OnModeRequested;
         WandSpellDemoController.DuelPoseReceived -= OnPose;
         WandSpellDemoController.DuelCastReceived -= OnCast;
     }
 
     void Update() {
         if (started && Input.GetKeyDown(KeyCode.F2)) ResetRound();
+        if (started && botOpponent && !roundOver && Time.time >= nextBotCastAt)
+            BotAttack();
+    }
+
+    void OnModeRequested(string mode) {
+        bool firstModePacket = !started;
+        botOpponent = mode == "single";
+        if (firstModePacket) nextBotCastAt = Time.time + Random.Range(2f, 3.5f);
+        BeginDuel();
     }
 
     void BeginDuel() {
@@ -57,7 +68,8 @@ public sealed class PvPDuelController : MonoBehaviour {
         CreateArena();
         CreatePlayer(0, new Vector3(-4f, 0f, 0f), new Color(.18f, .70f, 1f));
         CreatePlayer(1, new Vector3(4f, 0f, 0f), new Color(1f, .32f, .20f));
-        banner = MakeText("CAST YOUR SPELLS", new Vector3(0f, 4.3f, 0f), 2.4f, Color.white);
+        banner = MakeText(botOpponent ? "YOU VS THE WAND BOT" : "CAST YOUR SPELLS",
+            new Vector3(0f, 4.3f, 0f), 2.4f, Color.white);
         UpdateHealthUi();
     }
 
@@ -92,7 +104,9 @@ public sealed class PvPDuelController : MonoBehaviour {
         homeRotation[index] = Quaternion.LookRotation(direction);
 
         var labelX = index == 0 ? -2.6f : 2.6f;
-        healthLabels[index] = MakeText("PLAYER " + (index + 1) + "   100 HP",
+        string playerName = botOpponent ? (index == 0 ? "YOU" : "WAND BOT") :
+            "PLAYER " + (index + 1);
+        healthLabels[index] = MakeText(playerName + "   100 HP",
             new Vector3(labelX, 3.3f, 0f), 1.3f, color);
         var bar = MakePrimitive("Player " + (index + 1) + " health bar", PrimitiveType.Cube,
             new Vector3(labelX, 3.0f, 0f), new Vector3(3.2f, .20f, .12f), color);
@@ -137,6 +151,7 @@ public sealed class PvPDuelController : MonoBehaviour {
 
     void OnCast(int player, string spell, float confidence) {
         if (player < 1 || player > 2 || confidence < .55f) return;
+        if (botOpponent && player != 1) return;
         if (!started) BeginDuel();
         if (roundOver || Time.time - lastCast[player - 1] < Cooldown) return;
         int spellIndex = SpellIndex(spell);
@@ -145,7 +160,20 @@ public sealed class PvPDuelController : MonoBehaviour {
         StartCoroutine(SpellFlight(player - 1, spellIndex));
     }
 
-    IEnumerator SpellFlight(int attacker, int spellIndex) {
+    void BotAttack() {
+        nextBotCastAt = Time.time + Random.Range(2.4f, 4.1f);
+        int spellIndex = Random.Range(0, 4);
+        bool lands = Random.value >= .22f;
+        if (!lands) {
+            if (banner != null) banner.text = "WAND BOT MISSED!";
+            StartCoroutine(RestoreBannerAfter(.9f));
+            return;
+        }
+        if (banner != null) banner.text = "WAND BOT CASTS " + SpellName(spellIndex);
+        StartCoroutine(SpellFlight(1, spellIndex));
+    }
+
+    IEnumerator SpellFlight(int attacker, int spellIndex, bool lands = true) {
         int defender = 1 - attacker;
         var color = SpellColor(spellIndex);
         Vector3 origin = wands[attacker] != null ? wands[attacker].position :
@@ -167,16 +195,24 @@ public sealed class PvPDuelController : MonoBehaviour {
         }
         orb.transform.position = target;
         Destroy(orb);
-        ApplyDamage(defender, spellIndex);
+        if (lands) ApplyDamage(defender, spellIndex);
     }
 
     void ApplyDamage(int defender, int spellIndex) {
         float[] damage = { 16f, 11f, 13f, 22f };
         health[defender] = Mathf.Max(0f, health[defender] - damage[spellIndex]);
         UpdateHealthUi();
+        if (!roundOver && banner != null) {
+            banner.text = botOpponent
+                ? (defender == 1 ? "YOU HIT THE WAND BOT!" : "WAND BOT HITS YOU!")
+                : "PLAYER " + (2 - defender) + " HIT!";
+            StartCoroutine(RestoreBannerAfter(.9f));
+        }
         if (health[defender] <= 0f) {
             roundOver = true;
-            if (banner != null) banner.text = "PLAYER " + (2 - defender) + " WINS!";
+            if (banner != null) banner.text = botOpponent
+                ? (defender == 1 ? "YOU WIN!" : "WAND BOT WINS!")
+                : "PLAYER " + (2 - defender) + " WINS!";
             StartCoroutine(ResetAfterRound());
         }
     }
@@ -186,20 +222,31 @@ public sealed class PvPDuelController : MonoBehaviour {
         ResetRound();
     }
 
+    IEnumerator RestoreBannerAfter(float delay) {
+        yield return new WaitForSeconds(delay);
+        if (!roundOver && banner != null)
+            banner.text = botOpponent ? "YOU VS THE WAND BOT" : "CAST YOUR SPELLS";
+    }
+
     void ResetRound() {
         health[0] = MaxHealth;
         health[1] = MaxHealth;
         lastCast[0] = -10f;
         lastCast[1] = -10f;
         roundOver = false;
-        if (banner != null) banner.text = "CAST YOUR SPELLS";
+        nextBotCastAt = Time.time + Random.Range(2f, 3.5f);
+        if (banner != null)
+            banner.text = botOpponent ? "YOU VS THE WAND BOT" : "CAST YOUR SPELLS";
         UpdateHealthUi();
     }
 
     void UpdateHealthUi() {
         for (int i = 0; i < 2; i++) {
-            if (healthLabels[i] != null)
-                healthLabels[i].text = "PLAYER " + (i + 1) + "   " + Mathf.CeilToInt(health[i]) + " HP";
+            if (healthLabels[i] != null) {
+                string playerName = botOpponent ? (i == 0 ? "YOU" : "WAND BOT") :
+                    "PLAYER " + (i + 1);
+                healthLabels[i].text = playerName + "   " + Mathf.CeilToInt(health[i]) + " HP";
+            }
             if (healthFill[i] != null) {
                 float ratio = health[i] / MaxHealth;
                 healthFill[i].localScale = new Vector3(3.2f * ratio, .20f, .12f);

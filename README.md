@@ -175,37 +175,62 @@ Wand**, which looks for a headset. If no connection is reported, check Unity is
 in Play mode with the correct scene and UDP port **5055** is available. You can
 also play with the mouse alone using the desktop controls below.
 
-## Local PvP duel with two Arduino wands
+## Desktop game: play solo or PvP
 
-Two people can play on one computer using the Unity Editor. Connect both Arduino
-boards by USB, start the same Unity scene in Play mode, and run the duel
-recognizer instead of `live_predict.py`. Each wand has an independent sensor
-stream and gesture recognizer. Recognized spells automatically fly at the other
-player; each player starts with 100 health. Lightning hits hardest, while water,
-wind, and fire deal less damage. The first player to lose all health loses the
-round; health resets after a short pause. Wand orientation animates each
-player's wand, but the IMU does not track room position or support dodging.
+The desktop launcher uses connected Arduinos as controllers and selects the
+match automatically. One wand starts a solo match against the Wand Bot; two
+wands start local PvP. Each wand has its own gesture recognition. Spells
+automatically fly toward the opponent, both players start with 100 health, and
+lightning hits hardest. The bot attacks periodically and sometimes misses.
+The first player to lose all health loses the round; health resets after a
+short pause. The IMU does not track room position, so spells automatically
+target the opponent rather than using physical aiming or dodging.
 
-The launcher auto-selects the first two detected Arduino ports. To set player
-order explicitly, pass both serial ports:
+To try the flow in Unity Editor, open
+`unity/Assets/Scenes/WandSpellsMeetingDemo.unity` and press **Play**, connect one
+or two Arduino boards, then run:
 
 **macOS:**
 
 ```bash
-.venv/bin/python python/pvp_predict.py --player1-port /dev/cu.usbmodem14101 --player2-port /dev/cu.usbmodem14201
+.venv/bin/python python/play_wand.py
 ```
 
 **Windows (Command Prompt):**
 
 ```bat
-.venv\Scripts\python.exe python\pvp_predict.py --player1-port COM3 --player2-port COM4
+.venv\Scripts\python.exe python\play_wand.py
 ```
 
-Keep both wands still until calibration finishes. The Unity game switches to
-the duel automatically when it receives the PvP recognizer's heartbeat. Press
-**R** in either recognition window to recenter both wands; press **Q/Esc** to
-quit. Run `python/pvp_predict.py --help` for all options. This local PvP mode is
-for the Unity Editor on one shared screen; it does not use the Quest APK.
+Keep each wand still until calibration finishes. The Unity game selects bot or
+PvP mode from the number of connected controllers. Press **R** in a recognition
+window to recenter the wand(s); press **Q/Esc** to quit. Port order can be set
+with `--player1-port` and optional `--player2-port`.
+
+### Build a one-file desktop launcher
+
+The release launcher packages the trained model, Python recognizer, and Unity
+desktop game together. Build it on the target operating system; Windows
+produces `WandSpells.exe`, while macOS produces `WandSpells.app`.
+
+1. In Unity, use **Tools → Wand Spells → Build Desktop Player → Windows x64**
+   or **macOS**. The matching Unity Build Support module must be installed.
+2. From the repository root, install packaging dependencies:
+
+   ```bash
+   python -m pip install -r python/requirements.txt -r tools/desktop-packaging-requirements.txt
+   ```
+
+3. Build the launcher on that same platform:
+
+   ```bash
+   python -m PyInstaller desktop_bundle.spec --clean
+   ```
+
+The result is in `dist/`. Double-clicking it starts the game and chooses solo
+or PvP from the detected Arduino count. End users do not need Unity, Python, or
+the setup scripts. The launcher still requires the USB/serial driver for the
+connected Arduino boards.
 
 ## Editing the Unity game
 
