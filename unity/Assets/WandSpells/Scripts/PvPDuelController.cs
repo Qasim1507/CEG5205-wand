@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR;
+using CommonUsages = UnityEngine.XR.CommonUsages;
 
 /// <summary>
 /// Local wand game view. A second connected Arduino enables PvP; with one wand,
