@@ -9,7 +9,34 @@ MPU-6050 → Arduino Mega → USB → laptop Python → Wi-Fi → Quest 3
                                 live rotation + recognized spells
 ```
 
-## Quick start: play the game
+## Directory Structure
+
+```
+.
+├── arduino/
+├── data/
+├── models/
+├── python/
+├── unity/
+├── Setup Quest Wand.cmd
+├── Start Quest Wand.cmd
+├── Setup Quest Wand.command
+├── Start Quest Wand.command
+├── LAPTOP_QUEST.md
+└── README.md
+```
+
+### Folder Overview
+
+| Folder | Description |
+|--------|-------------|
+| `arduino/` | Arduino sketch to be uploaded to the **Arduino Mega 2560**. ([Flash the Arduino](#2-flash-the-arduino)) |
+| `data/` | Gesture data collected by team members for model training. Contains **5 gesture classes** with **25 images per class**. ([Data Collection](#6-collecting-a-real-dataset)) |
+| `models/` | Trained model output. The final model is saved as `gesture_model.joblib` after training. ([Model Training](#7-training-and-live-recognition)) |
+| `python/` | Python scripts for (1) IMU data collection and visualisation, (2) model training, and (3) a UDP link that streams predictions to the Unity application server. |
+| `unity/` | Unity project folder. ([Unity Setup](#run-the-unity-scene-on-your-computer)) |
+
+## Play on your computer with the Arduino (Meta Quest Headset)
 
 ### What you need
 
@@ -132,7 +159,7 @@ on the launch command. The Arduino must stay connected to the laptop.
 Mac + Quest hardware playback is verified. Windows launchers and discovery are
 provided, but still need verification on a Windows laptop with the actual hardware.
 
-## Play on your computer with the Arduino (no Quest)
+## Play on your computer with the Arduino (no Meta Quest Headset)
 
 You can play in **Unity Editor** using the physical Arduino/IMU wand. A Quest
 headset and Wi-Fi are not required: Python sends movement and spells to Unity
