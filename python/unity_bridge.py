@@ -23,10 +23,11 @@ class UnityBridge:
         self.last_ack = 0.0
         self.was_connected = False
         self.game_status = None
-        self.last_pose = 0.
+        self.last_pose_by_player = {}
         self.pose_sequence = 0
         self.pose_count = 0
         self.pose_angle = 0.
+        self.game_mode = None
 
     def send(self, packet: dict) -> None:
         packet = dict(packet, session=self.session)
@@ -37,7 +38,10 @@ class UnityBridge:
         if now - self.last_ping >= 1.0:
             self.last_ping = now
             try:
-                self.send({"type": "ping"})
+                ping = {"type": "ping"}
+                if self.game_mode:
+                    ping["mode"] = self.game_mode
+                self.send(ping)
             except OSError as exc:
                 print(f"Quest link: {exc}", flush=True)
         while True:
@@ -70,20 +74,26 @@ class UnityBridge:
                   "Quest link: no reply (check app, headset sleep and Wi-Fi)", flush=True)
             self.was_connected = connected
 
-    def pose(self, quaternion, origin=0):
+    def pose(self, quaternion, origin=0, player=0):
         now = time.monotonic()
-        if not self.was_connected or now - self.last_pose < .02:
+        last_pose = self.last_pose_by_player.get(player, 0.)
+        if not self.was_connected or now - last_pose < .02:
             return False
-        self.last_pose = now
+        self.last_pose_by_player[player] = now
         self.pose_sequence += 1
         try:
-            self.send({"type": "pose", "pose_id": self.pose_sequence,
+            self.send({"type": "pose", "player": player,
+                       "pose_id": self.pose_sequence,
                        "origin": origin, "q": quaternion})
         except OSError:
             return False
         return True
 
-    def cast(self, cast, min_confidence: float) -> bool:
+    def set_mode(self, mode: str | None) -> None:
+        """Ask the game to enter a named local mode on its next heartbeat."""
+        self.game_mode = mode
+
+    def cast(self, cast, min_confidence: float, player=0) -> bool:
         if (not cast.accepted or not math.isfinite(cast.confidence)
                 or cast.confidence < min_confidence
                 or cast.spell not in GAME_SPELLS):
@@ -94,7 +104,8 @@ class UnityBridge:
             return False
         self.sequence += 1
         try:
-            self.send({"type": "cast", "id": self.sequence,
+            self.send({"type": "cast", "player": player,
+                       "id": self.sequence,
                        "spell": GAME_SPELLS[cast.spell], "gesture": cast.label,
                        "conf": float(cast.confidence)})
         except OSError as exc:

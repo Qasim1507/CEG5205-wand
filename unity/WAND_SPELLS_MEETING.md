@@ -32,4 +32,34 @@ follows continuous IMU pose packets. Physical wand position is not tracked. Pres
 A/X on a Quest controller (or R in the laptop predictor) to center its direction.
 Mouse aiming/clicking remains available on desktop.
 
+## Local solo and PvP modes
+
+The desktop game selects its mode from the connected Arduino count. Connect one
+Arduino for a match against the Wand Bot, or two for local PvP. In Unity Editor,
+open this scene but leave Play mode stopped. Start `python/play_wand.py` from the
+repository root, then press Unity's **Play** button while the wand(s) calibrate.
+Each wand is recognized independently, and spells travel toward the
+opponent when the aim ray hits. The duel scene has an expanded courtyard, glowing
+runes, floating crystals, spell trails, and impact sparks.
+
+For Quest PvP, build and install the updated APK on **two headsets**. Put both
+headsets and the laptop on the same Wi-Fi. Connect two Arduino wands to the
+laptop and run `python/play_wand.py --player1-port PORT1 --player2-port PORT2
+--unity-host PLAYER1_QUEST_IP` from the repository root. In Player 1's headset,
+press **A** on the right controller to host; Player 2 presses **X** on the left
+controller to join. Each headset renders one full-screen first-person view;
+head direction aims spells, the left stick moves, and each wand controls its
+player's casts. Player 1's Quest receives both Arduino streams from the laptop,
+then relays duel state and spell effects to Player 2 over the LAN. See the
+repository README for the complete command and APK build location.
+
+A Quest player can also play against a desktop player on a second laptop. Each
+laptop connects one Arduino and runs `python/play_wand.py --online-duel` with its
+own port. The Quest laptop routes Python to the headset IP; the desktop laptop
+uses `--unity-host 127.0.0.1`, opens this scene, starts Python, then presses Play
+while calibration is running. On Quest press **A** to host or **X** to join; on
+desktop press **H** to host or **J** to join. Both game clients must be on the
+same Wi-Fi. Each client renders only its local player's view. The Quest uses
+head aim and left-stick movement; desktop uses mouse aim and WASD movement.
+
 The scene uses an original generated floor texture, [Poly Haven Medieval Blocks 03](https://polyhaven.com/a/medieval_blocks_03) CC0 wall textures, and [Cinzel](https://github.com/google/fonts/tree/main/ofl/cinzel) under the SIL Open Font License. The font license is included in `Assets/WandSpells/Fonts/OFL.txt`.

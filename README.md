@@ -4,6 +4,9 @@ Move a physical IMU wand to rotate a virtual wand and cast spells in a Quest 3
 wizard game. A trained classifier runs on the laptop; the Quest runs the included
 Unity Android app. The repository also contains the recording and training tools.
 
+For step-by-step setup, desktop play, Quest play, and mixed-device PvP, see the
+[Player Manual](PLAYER_MANUAL.md).
+
 ```text
 MPU-6050 → Arduino Mega → USB → laptop Python → Wi-Fi → Quest 3
                                 live rotation + recognized spells
@@ -202,12 +205,168 @@ Wand**, which looks for a headset. If no connection is reported, check Unity is
 in Play mode with the correct scene and UDP port **5055** is available. You can
 also play with the mouse alone using the desktop controls below.
 
+## Desktop game: play solo or PvP
+
+The desktop launcher uses connected Arduinos as controllers and selects the
+match automatically. One wand starts a solo match against the Wand Bot; two
+wands start local PvP. Each wand has its own gesture recognition. On desktop,
+the mouse cursor aims, and spells only hit when the aim ray reaches the opponent.
+Press **Space** to lock/unlock the cursor position while making a wand gesture
+to cast. Both players start with 100 health, and lightning hits hardest.
+Solo mode uses the same level against a bot; the bot moves and adapts its casting
+pace to the health lead. In two-player mode, the existing level is shown in
+split-screen, with each player moving from the keyboard. The first player to
+lose all health loses the round; health resets after a short pause. The IMUs
+recognize spell gestures; the mouse aims and the keyboard handles movement.
+Keeping the camera level avoids roll from wand motion.
+
+To try the flow in Unity Editor, open
+`unity/Assets/Scenes/WandSpellsMeetingDemo.unity` but leave it out of Play mode.
+Connect one or two Arduino boards, start the Python command, then switch to
+Unity and press **Play while the wand(s) are calibrating**:
+
+**macOS:**
+
+```bash
+.venv/bin/python python/play_wand.py
+```
+
+**Windows (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py
+```
+
+Keep each wand still until calibration finishes. The Unity game selects bot or
+PvP mode from the number of connected controllers. Press **R** in a recognition
+window to recenter the wand(s); press **Q/Esc** to quit. Port order can be set
+with `--player1-port` and optional `--player2-port`.
+
+In the game, **WASD** moves Player 1. In two-wand PvP, **arrow keys** move
+Player 2. Move the mouse into a player's screen half to aim for them; **Space**
+locks or releases the aim point. A recognized wand gesture casts the spell.
+Press **F2** to restart a round.
+
+The project includes Unity OpenXR and Meta OpenXR support. Quest duel mode uses
+two headsets, one per player. Each player sees a full-screen first-person view,
+looks to aim, and uses the left controller stick to move. Both headsets show
+their own health as **YOU** and the other player's as **OPPONENT**.
+
+### Quest PvP with two headsets
+
+Build the updated APK from Unity (**Tools → Wand Spells → Build Quest APK**) and
+install that same build on both headsets. Put both Quests and the laptop on the
+same Wi-Fi. Start the game on each headset. Connect both Arduino wands to the
+laptop, then start the Python controller link, routing it to Player 1's Quest IP.
+Use the port names shown by your operating system:
+
+**macOS:**
+
+```bash
+.venv/bin/python python/play_wand.py --player1-port /dev/cu.usbmodem11101 --player2-port /dev/cu.usbmodem11102 --unity-host 192.168.1.20
+```
+
+**Windows (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py --player1-port COM3 --player2-port COM4 --unity-host 192.168.1.20
+```
+
+Replace the example ports and IP with your actual serial ports and Player 1's
+Wi-Fi IP. In Player 1's headset, press **A** on the right
+controller to host; in Player 2's headset, press **X** on the left controller to
+join. Each headset then has its own tracked POV. Head direction aims spells,
+left stick movement moves around the larger courtyard, and each wand's gesture
+casts its assigned player's spell. The laptop sends both wand streams to the
+host Quest; the headsets exchange movement, aim, health, and spell effects over
+UDP port **5060**. The laptop-to-Quest wand link uses UDP port **5055**.
+
+The Quest duel is a LAN prototype: it needs Wi-Fi that allows devices to talk
+to each other, and the headset build must be rebuilt after Unity code changes.
+The packaged APK may not contain the latest duel code. Local desktop PvP remains
+available separately through Unity Editor or the desktop launcher.
+
+### Mixed Quest and desktop PvP (two laptops)
+
+One player can use a Quest while the other plays on a desktop monitor. Each
+player connects one Arduino to their own laptop. Both laptops, the Quest, and
+both game clients must be on the same Wi-Fi network. Build and install this
+branch's APK on the Quest first.
+
+On the Quest player's laptop, start the Python bridge with the Quest's Wi-Fi IP.
+Then launch the app on the headset. On the desktop player's laptop, open the
+Unity project and duel scene, start Python, and press **Play** in Unity while
+the wand is calibrating. Each player should run one of these commands, using
+their own Arduino port:
+
+**Mac — Quest player's laptop:**
+
+```bash
+.venv/bin/python python/play_wand.py --online-duel --player1-port /dev/cu.usbmodemXXXX --unity-host QUEST_WIFI_IP
+```
+
+**Mac — desktop player's laptop:**
+
+```bash
+.venv/bin/python python/play_wand.py --online-duel --player1-port /dev/cu.usbmodemYYYY --unity-host 127.0.0.1
+```
+
+**Windows — Quest player's laptop (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py --online-duel --player1-port COM3 --unity-host QUEST_WIFI_IP
+```
+
+**Windows — desktop player's laptop (Command Prompt):**
+
+```bat
+.venv\Scripts\python.exe python\play_wand.py --online-duel --player1-port COM4 --unity-host 127.0.0.1
+```
+
+Replace the example Arduino ports and `QUEST_WIFI_IP`. Once both games are
+running, choose a host: the Quest host presses **A**; the desktop host presses
+**H**. The other player joins by pressing **X** on Quest or **J** on desktop.
+Each player sees only their own full-screen point of view. The Quest player aims
+with their head and moves with the left stick; the desktop player aims with the
+mouse and moves with **WASD**. Wand gestures cast spells for the local player.
+
+This peer-to-peer setup is for the same local network. Guest Wi-Fi or client
+isolation may block discovery. Playing from different networks would require an
+internet relay or a publicly reachable server.
+
+### Build a one-file desktop launcher
+
+The release launcher packages the trained model, Python recognizer, and Unity
+desktop game together. Build it on the target operating system; Windows
+produces `WandSpells.exe`, while macOS produces `WandSpells.app`.
+
+1. In Unity, use **Tools → Wand Spells → Build Desktop Player → Windows x64**
+   or **macOS**. The matching Unity Build Support module must be installed.
+2. From the repository root, install packaging dependencies:
+
+   ```bash
+   python -m pip install -r python/requirements.txt -r tools/desktop-packaging-requirements.txt
+   ```
+
+3. Build the launcher on that same platform:
+
+   ```bash
+   python -m PyInstaller desktop_bundle.spec --clean
+   ```
+
+The result is in `dist/`. Double-clicking it starts the game and chooses solo
+or PvP from the detected Arduino count. End users do not need Unity, Python, or
+the setup scripts. The launcher still requires the USB/serial driver for the
+connected Arduino boards.
+
 ## Editing the Unity game
 
 Open [`unity/`](unity/) in Unity Hub with **6000.6.4f1**, then open
 `Assets/Scenes/WandSpellsMeetingDemo.unity`. Install **Android Build Support**,
 including SDK, NDK and OpenJDK, if building for Quest. Use
-**Tools → Wand Spells → Build Quest APK**, then rerun setup to install the new APK.
+**Tools → Wand Spells → Build Quest APK**. The APK is written to
+`unity/Builds/WandSpellsMeetingDemo.apk`; install it on each headset you want to
+use. Rerun setup to update a single USB-connected headset.
 See [Unity scene instructions](unity/WAND_SPELLS_MEETING.md) for desktop controls.
 
 ## Data collection and training reference

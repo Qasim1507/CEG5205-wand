@@ -14,6 +14,10 @@ using UnityEngine.XR;
 /// CastSpell entry point accepts predictions from the Python IMU model.
 /// </summary>
 public sealed class WandSpellDemoController : MonoBehaviour {
+    public static event Action<string> GameModeRequested;
+    public static event Action<int, Quaternion> DuelPoseReceived;
+    public static event Action<int, string, float> DuelCastReceived;
+
     [Serializable]
     sealed class SensorPacket {
         public string type;
@@ -21,6 +25,8 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         public int id;
         public int pose_id;
         public int origin;
+        public int player;
+        public string mode;
         public string spell;
         public float conf;
         public float[] q;
@@ -60,6 +66,10 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     readonly Queue<IncomingPacket> incoming = new Queue<IncomingPacket>();
     string activeSession;
     int lastPacketId;
+    readonly string[] duelSessions = new string[2];
+    readonly int[] duelLastCastIds = new int[2];
+    readonly int[] duelLastPoseIds = new int[2];
+    readonly int[] duelPoseOrigins = { int.MinValue, int.MinValue };
     int gazeChoice = -1;
     float gazeStarted;
     string poseSession;
@@ -100,6 +110,41 @@ public sealed class WandSpellDemoController : MonoBehaviour {
     Vector3[] crystalHome;
     Vector2 aimViewport = new Vector2(.5f, .5f);
     bool skipMouseDelta;
+    bool desktopDuelActive;
+
+    public Transform DesktopRig => sceneRig;
+
+    /// <summary>Skip the wand-selection tutorial and keep its level as the desktop duel map.</summary>
+    public void ActivateDesktopDuel() {
+        ActivateDuelAt(new Vector3(-2f, 0f, -3.25f), Quaternion.Euler(0f, 90f, 0f));
+    }
+
+    /// <summary>Enter duel play from a player-specific world spawn.</summary>
+    public void ActivateDuelAt(Vector3 spawnPosition, Quaternion spawnRotation) {
+        desktopDuelActive = true;
+        wandStyle = 0;
+        arenaReady = true;
+        if (sceneRig != null) {
+            sceneRig.position = spawnPosition;
+            sceneRig.rotation = spawnRotation;
+        }
+        if (wandStyles != null)
+            for (int i = 0; i < wandStyles.Length; i++)
+                if (wandStyles[i] != null) wandStyles[i].gameObject.SetActive(i == 0);
+        if (choiceText != null) choiceText.gameObject.SetActive(false);
+        if (scoreText != null) scoreText.gameObject.SetActive(false);
+        if (crosshair != null) crosshair.gameObject.SetActive(false);
+        if (aimMarker != null) aimMarker.gameObject.SetActive(false);
+        if (hudRoot != null) hudRoot.gameObject.SetActive(false);
+        if (entranceDoors != null) {
+            if (entranceDoors.Length > 0 && entranceDoors[0] != null)
+                entranceDoors[0].localPosition += Vector3.left * 1.7f;
+            if (entranceDoors.Length > 1 && entranceDoors[1] != null)
+                entranceDoors[1].localPosition += Vector3.right * 1.7f;
+        }
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
 
     [SerializeField] private Renderer runicAlcoveShadow;   // the Renderer on "Runic alcove shadow"
     [SerializeField] private Material whiteMaterial;       // your existing White material asset
@@ -201,6 +246,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
         bool pressed = rightPressed || leftPressed;
         if (pressed && !recenterButtonDown) RecenterWand();
         recenterButtonDown = pressed;
+        if (!desktopDuelActive) {
         // The physical wand is the spell input. Head gaze lets Quest users
         // choose a cosmetic wand without a keyboard or a spare controller.
         if (XRSettings.isDeviceActive && wandStyle < 0 && viewCamera != null) {
@@ -292,6 +338,7 @@ public sealed class WandSpellDemoController : MonoBehaviour {
  
         if (XRSettings.isDeviceActive && wandStyle >= 0 && arenaReady && viewCamera != null)
             UpdateHeadAim();
+        }
 
         while (true) {
             IncomingPacket message;
@@ -302,8 +349,52 @@ public sealed class WandSpellDemoController : MonoBehaviour {
             try {
                 var packet = JsonUtility.FromJson<SensorPacket>(message.json);
                 if (packet == null) continue;
+                if (packet.mode == "duel" || packet.mode == "single" || packet.mode == "online")
+                    GameModeRequested?.Invoke(packet.mode);
+                if (packet.player == 1 || packet.player == 2) {
+                    int playerIndex = packet.player - 1;
+                    if (packet.type == "pose") {
+                        if (string.IsNullOrEmpty(packet.session) || packet.q == null || packet.q.Length != 4)
+                            continue;
+                        if (duelSessions[playerIndex] != packet.session) {
+                            duelSessions[playerIndex] = packet.session;
+                            duelLastCastIds[playerIndex] = 0;
+                            duelLastPoseIds[playerIndex] = 0;
+                            duelPoseOrigins[playerIndex] = int.MinValue;
+                        }
+                        if (packet.origin != duelPoseOrigins[playerIndex]) {
+                            duelPoseOrigins[playerIndex] = packet.origin;
+                            duelLastPoseIds[playerIndex] = 0;
+                        }
+                        if (packet.pose_id <= duelLastPoseIds[playerIndex]) continue;
+                        duelLastPoseIds[playerIndex] = packet.pose_id;
+                        var pose = new Quaternion(packet.q[1], packet.q[2], packet.q[3], packet.q[0]);
+                        float norm = Mathf.Sqrt(pose.x * pose.x + pose.y * pose.y + pose.z * pose.z + pose.w * pose.w);
+                        if (norm > 0.1f) DuelPoseReceived?.Invoke(packet.player, pose.normalized);
+                        continue;
+                    }
+                    if (packet.type == "cast") {
+                        if (string.IsNullOrEmpty(packet.session) || packet.id <= 0) continue;
+                        if (duelSessions[playerIndex] != packet.session) {
+                            duelSessions[playerIndex] = packet.session;
+                            duelLastCastIds[playerIndex] = 0;
+                            duelLastPoseIds[playerIndex] = 0;
+                            duelPoseOrigins[playerIndex] = int.MinValue;
+                        }
+                        if (packet.id <= duelLastCastIds[playerIndex]) {
+                            SendReply(message.endpoint, packet, "duplicate");
+                            continue;
+                        }
+                        duelLastCastIds[playerIndex] = packet.id;
+                        DuelCastReceived?.Invoke(packet.player, packet.spell, packet.conf);
+                        SendReply(message.endpoint, packet, "cast");
+                        continue;
+                    }
+                }
                 if (packet.type == "ping") {
-                    SendReply(message.endpoint, packet, arenaReady ? "ready" : "choose_wand");
+                    SendReply(message.endpoint, packet, packet.mode == "duel" ? "duel" :
+                        packet.mode == "single" ? "single" : packet.mode == "online" ? "online" :
+                        arenaReady ? "ready" : "choose_wand");
                     continue;
                 }
                 if (packet.type == "pose") {
